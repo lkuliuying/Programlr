@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>独立模块页面预览 · 项目解读实验室</title>
+<style>
+:root{color-scheme:dark;font-family:"Microsoft YaHei",system-ui,sans-serif;background:#071520;color:#e6f2f5}
+*{box-sizing:border-box}body{margin:0}header{padding:40px max(24px,5vw) 28px;border-bottom:1px solid #184155}h1{margin:0 0 16px;font-size:30px}p{line-height:1.8;color:#aec4cf;max-width:1080px}a{color:#4be3d2;text-decoration:none}a:hover{text-decoration:underline}.badge{display:inline-block;border:1px solid #267566;color:#62eedc;padding:4px 10px;font-size:13px;border-radius:4px}nav{display:flex;flex-wrap:wrap;gap:12px 20px;padding-top:12px}main{padding:24px max(24px,5vw) 60px}article{margin:0 0 38px;scroll-margin-top:20px}h2{font-size:22px;margin:0 0 8px}article p{margin:0 0 16px}img{display:block;width:100%;height:auto;border:1px solid #205568;border-radius:6px;background:#06121c}footer{font-size:13px;color:#91adbb;padding:20px max(24px,5vw);border-top:1px solid #184155}@media(min-width:1800px){main,header,footer{max-width:1760px;margin:auto}}
+</style>
+</head>
+<body>
+<header><span class="badge">设计预览 · 11 个独立模块</span><h1>项目解读实验室</h1>
+<p>使用 <code>test/task-board.zip</code>（task-board/1.0.0，9 个源码文件）作为内容依据。沿用深色青绿色外壳，各模块独立标题、布局和操作。图片按 1440×900 桌面布局比例设计，生成原图为 1586×992。</p>
+<p>这些图片用于确认页面分工与视觉方向。接口输入/响应、服务关系和讲解范围属于源码阅读示意；实际应用遵循现有 API 的可用信息和安全边界。图片不代表已执行实验、模型调用、学习完成或快照差异。源码图采用摘录，实际行号以源码阅读窗口为准。</p>
+<nav aria-label="模块预览导航"><a href="#workbench">工作台</a><a href="#import">项目导入</a><a href="#source">源码阅读</a><a href="#api">API 分析</a><a href="#graph">静态关系图</a><a href="#comparison">快照与对比</a><a href="#impact">候选影响</a><a href="#learning">知识与学习</a><a href="#labs">练习与实验</a><a href="#explanation">模型讲解</a><a href="#jobs">系统与任务</a></nav></header>
+<main><article id="workbench"><h2>工作台</h2><p>项目摘要、分析准备状态和下一步入口。 <a href="workbench.png">查看原图</a></p><img src="workbench.png" width="1586" height="992" alt="工作台独立页面设计预览" loading="lazy"></article>
+<article id="import"><h2>项目导入</h2><p>ZIP 上传、只读导入规则及快照结果。 <a href="import.png">查看原图</a></p><img src="import.png" width="1586" height="992" alt="项目导入独立页面设计预览" loading="lazy"></article>
+<article id="source"><h2>源码阅读</h2><p>文件树、分段源码和双窗口定位。 <a href="source.png">查看原图</a></p><img src="source.png" width="1586" height="992" alt="源码阅读独立页面设计预览" loading="lazy"></article>
+<article id="api"><h2>API 分析</h2><p>接口清单、前后端来源及输入响应的源码阅读示意。 <a href="api.png">查看原图</a></p><img src="api.png" width="1586" height="992" alt="API 分析独立页面设计预览" loading="lazy"></article>
+<article id="graph"><h2>静态关系图</h2><p>静态节点、关联路径和节点证据示意。 <a href="graph.png">查看原图</a></p><img src="graph.png" width="1586" height="992" alt="静态关系图独立页面设计预览" loading="lazy"></article>
+<article id="comparison"><h2>快照与对比</h2><p>快照时间线；样例只有一份快照时明确要求第二份。 <a href="comparison.png">查看原图</a></p><img src="comparison.png" width="1586" height="992" alt="快照与对比独立页面设计预览" loading="lazy"></article>
+<article id="impact"><h2>候选影响</h2><p>选择影响起点，核对路径及候选关系人工决定。 <a href="impact.png">查看原图</a></p><img src="impact.png" width="1586" height="992" alt="候选影响独立页面设计预览" loading="lazy"></article>
+<article id="learning"><h2>知识与学习</h2><p>知识卡片、学习目标和先修路径。 <a href="learning.png">查看原图</a></p><img src="learning.png" width="1586" height="992" alt="知识与学习独立页面设计预览" loading="lazy"></article>
+<article id="labs"><h2>练习与实验</h2><p>固定练习、回顾和受控实验；初始待作答、待运行。 <a href="labs.png">查看原图</a></p><img src="labs.png" width="1586" height="992" alt="练习与实验独立页面设计预览" loading="lazy"></article>
+<article id="explanation"><h2>模型讲解</h2><p>本地讲解、源码引用和模型单次外发确认。 <a href="explanation.png">查看原图</a></p><img src="explanation.png" width="1586" height="992" alt="模型讲解独立页面设计预览" loading="lazy"></article>
+<article id="jobs"><h2>系统与任务</h2><p>基础检查、任务状态和历史；未检查时不展示结果。 <a href="jobs.png">查看原图</a></p><img src="jobs.png" width="1586" height="992" alt="系统与任务独立页面设计预览" loading="lazy"></article></main>
+<footer>本页为本地静态图片索引。图片尺寸与 SHA-256 见 <a href="manifest.json">预览清单</a>；页面实现与实际验证见 <a href="../../phase-4-plan.md">第四阶段计划</a>。</footer>
+</body>
+</html>
+

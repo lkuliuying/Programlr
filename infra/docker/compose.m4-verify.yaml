@@ -1,0 +1,27 @@
+# 独立 M4 验收实例；模型保持关闭，模型替身由测试专用入口显式启用。
+x-m4-environment: &m4-environment
+  APP_PORT: "5176"
+  APP_ORIGIN: http://127.0.0.1:5176
+  MODEL_BASE_URL: ""
+  MODEL_NAME: ""
+services:
+  migrate:
+    image: learning-lab-backend:m4-verify
+    environment: *m4-environment
+  api:
+    image: learning-lab-backend:m4-verify
+    environment: *m4-environment
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen(urllib.request.Request('http://127.0.0.1:8000/api/v1/jobs/', headers={'Host':'127.0.0.1:5176'}), timeout=3).close()"]
+  worker:
+    image: learning-lab-backend:m4-verify
+    environment: *m4-environment
+  reconciler:
+    image: learning-lab-backend:m4-verify
+    environment: *m4-environment
+  frontend:
+    image: learning-lab-frontend:m4-verify
+    environment:
+      APP_AUTHORITY: 127.0.0.1:5176
+    ports: !override
+      - "127.0.0.1:5176:8080"

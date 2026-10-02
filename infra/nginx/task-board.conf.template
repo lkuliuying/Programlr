@@ -1,0 +1,24 @@
+server {
+    listen 8080;
+    server_name 127.0.0.1;
+    root /usr/share/nginx/html;
+    client_max_body_size 4k;
+    add_header X-Content-Type-Options nosniff always;
+    add_header Referrer-Policy same-origin always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'" always;
+    if ($http_host != "${APP_AUTHORITY}") { return 403; }
+
+    location /api/ {
+        resolver 127.0.0.11 valid=5s;
+        set $backend http://task-board-api:8000;
+        proxy_pass $backend;
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Forwarded-Host "";
+        proxy_set_header X-Forwarded-Proto "";
+        proxy_connect_timeout 3s;
+        proxy_read_timeout 15s;
+    }
+    location / {
+        try_files $uri /index.html;
+    }
+}

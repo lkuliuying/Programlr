@@ -1,0 +1,16 @@
+.runtime/
+.idea/
+.env
+.env.*
+!.env.example
+**/.venv/
+**/node_modules/
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/
+**/.ruff_cache/
+**/.mypy_cache/
+**/.vitest/
+**/dist/
+**/coverage/
+**/*.tsbuildinfo

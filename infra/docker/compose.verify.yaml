@@ -1,0 +1,14 @@
+# 只用于有界故障验收；正常启动不加载此文件。
+services:
+  api:
+    environment:
+      JOB_QUEUE_TIMEOUT_SECONDS: "10"
+      JOB_EXECUTION_TIMEOUT_SECONDS: "10"
+  worker:
+    environment:
+      JOB_QUEUE_TIMEOUT_SECONDS: "10"
+      JOB_EXECUTION_TIMEOUT_SECONDS: "10"
+  reconciler:
+    environment:
+      JOB_QUEUE_TIMEOUT_SECONDS: "10"
+      JOB_EXECUTION_TIMEOUT_SECONDS: "10"

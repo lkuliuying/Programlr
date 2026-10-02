@@ -1,0 +1,27 @@
+# 在 M5 隔离实验配置上覆盖本版镜像和回环入口，不修改日常实例。
+x-v03-environment: &v03-environment
+  APP_PORT: "5180"
+  APP_ORIGIN: http://127.0.0.1:5180
+  MODEL_BASE_URL: ""
+  MODEL_NAME: ""
+services:
+  migrate:
+    image: learning-lab-backend:v03-verify
+    environment: *v03-environment
+  api:
+    image: learning-lab-backend:v03-verify
+    environment: *v03-environment
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen(urllib.request.Request('http://127.0.0.1:8000/api/v1/knowledge-curricula/', headers={'Host':'127.0.0.1:5180'}), timeout=3).close()"]
+  worker:
+    image: learning-lab-backend:v03-verify
+    environment: *v03-environment
+  reconciler:
+    image: learning-lab-backend:v03-verify
+    environment: *v03-environment
+  frontend:
+    image: learning-lab-frontend:v03-verify
+    environment:
+      APP_AUTHORITY: 127.0.0.1:5180
+    ports: !override
+      - "127.0.0.1:5180:8080"

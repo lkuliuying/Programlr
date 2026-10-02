@@ -1,0 +1,226 @@
+name: learning-lab
+
+x-backend: &backend
+  image: learning-lab-backend:m1-t02
+  build:
+    context: .
+    dockerfile: infra/docker/backend.Dockerfile
+  environment: &backend-environment
+    DJANGO_SETTINGS_MODULE: config.settings.local
+    APP_HOST: 127.0.0.1
+    APP_PORT: "5173"
+    APP_ORIGIN: http://127.0.0.1:5173
+    DJANGO_SECRET_KEY_FILE: /run/local-secrets/django_key
+    DATABASE_URL: postgresql://lab@postgres:5432/lab
+    DATABASE_PASSWORD_FILE: /run/local-secrets/database_password
+    CELERY_BROKER_URL: redis://redis:6379/0
+    WORKER_CONCURRENCY: "1"
+    JOB_QUEUE_TIMEOUT_SECONDS: "300"
+    JOB_EXECUTION_TIMEOUT_SECONDS: "300"
+  volumes:
+    - local-secrets:/run/local-secrets:ro
+    - import-data:/var/lib/learning-lab/imports
+  networks: [internal]
+  cpus: 1
+  mem_limit: 512m
+  pids_limit: 128
+  init: true
+  read_only: true
+  tmpfs: [/tmp]
+  security_opt: [no-new-privileges:true]
+
+x-task-board: &task-board
+  image: learning-lab-task-board-backend:1.0.0
+  build:
+    context: ./examples/task-board/backend
+    dockerfile: ../../../infra/docker/task-board-backend.Dockerfile
+  profiles: [task-board]
+  environment:
+    DJANGO_SETTINGS_MODULE: config.settings.local
+    DJANGO_SECRET_KEY_FILE: /run/local-secrets/django_key
+    DATABASE_PASSWORD_FILE: /run/local-secrets/database_password
+  volumes:
+    - task-board-secrets:/run/local-secrets:ro
+  networks: [task-board-internal]
+  cpus: 1
+  mem_limit: 512m
+  pids_limit: 128
+  init: true
+  read_only: true
+  tmpfs: [/tmp]
+  security_opt: [no-new-privileges:true]
+
+services:
+  initialize-imports:
+    image: python:3.13.15-slim-bookworm@sha256:2325bb286ec344af3e5898cc224b5844e2707ac6e26b1632516fd3edc84a5e26
+    command: [python, -c, "import os; os.chown('/var/lib/learning-lab/imports', 1000, 1000); os.chmod('/var/lib/learning-lab/imports', 0o700)"]
+    volumes:
+      - import-data:/var/lib/learning-lab/imports
+    network_mode: none
+    read_only: true
+    cpus: 0.25
+    mem_limit: 64m
+    pids_limit: 16
+  task-board-initialize:
+    image: python:3.13.15-slim-bookworm@sha256:2325bb286ec344af3e5898cc224b5844e2707ac6e26b1632516fd3edc84a5e26
+    profiles: [task-board]
+    command: [python, /initialize-secrets.py]
+    volumes:
+      - task-board-secrets:/run/local-secrets
+      - ./infra/docker/initialize-secrets.py:/initialize-secrets.py:ro
+    network_mode: none
+    read_only: true
+    cpus: 0.25
+    mem_limit: 64m
+    pids_limit: 16
+  task-board-postgres:
+    image: postgres:17.9-bookworm@sha256:47f917f7409eacd22fc5dfb1dee634e1b55cf0c01d1a7eb701be2227a03e0641
+    profiles: [task-board]
+    environment:
+      POSTGRES_DB: task_board
+      POSTGRES_USER: task_board
+      POSTGRES_PASSWORD_FILE: /run/local-secrets/database_password
+    volumes:
+      - task-board-data:/var/lib/postgresql/data
+      - task-board-secrets:/run/local-secrets:ro
+    networks: [task-board-internal]
+    depends_on:
+      task-board-initialize: {condition: service_completed_successfully}
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U task_board -d task_board"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    cpus: 1
+    mem_limit: 512m
+    pids_limit: 128
+  task-board-migrate:
+    <<: *task-board
+    command: [python, manage.py, migrate, --noinput]
+    depends_on:
+      task-board-postgres: {condition: service_healthy}
+  task-board-api:
+    <<: *task-board
+    depends_on:
+      task-board-migrate: {condition: service_completed_successfully}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen(urllib.request.Request('http://127.0.0.1:8000/api/v1/tasks/', headers={'Host':'127.0.0.1:5174'}), timeout=3).close()"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+  task-board-frontend:
+    image: learning-lab-task-board-frontend:1.0.0
+    profiles: [task-board]
+    build:
+      context: .
+      dockerfile: infra/docker/task-board-frontend.Dockerfile
+    environment:
+      APP_AUTHORITY: 127.0.0.1:5174
+    ports:
+      - "127.0.0.1:5174:8080"
+    networks: [task-board-internal, task-board-entry]
+    depends_on:
+      task-board-api: {condition: service_healthy}
+    cpus: 0.5
+    mem_limit: 128m
+    pids_limit: 64
+  initialize:
+    image: python:3.13.15-slim-bookworm@sha256:2325bb286ec344af3e5898cc224b5844e2707ac6e26b1632516fd3edc84a5e26
+    command: [python, /initialize-secrets.py]
+    volumes:
+      - local-secrets:/run/local-secrets
+      - ./infra/docker/initialize-secrets.py:/initialize-secrets.py:ro
+    network_mode: none
+    read_only: true
+    cpus: 0.25
+    mem_limit: 64m
+    pids_limit: 16
+  postgres:
+    image: postgres:17.9-bookworm@sha256:47f917f7409eacd22fc5dfb1dee634e1b55cf0c01d1a7eb701be2227a03e0641
+    environment:
+      POSTGRES_DB: lab
+      POSTGRES_USER: lab
+      POSTGRES_PASSWORD_FILE: /run/local-secrets/database_password
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - local-secrets:/run/local-secrets:ro
+    networks: [internal]
+    depends_on:
+      initialize: {condition: service_completed_successfully}
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U lab -d lab"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    cpus: 1
+    mem_limit: 512m
+    pids_limit: 128
+  redis:
+    image: redis:7.2.13-bookworm@sha256:37aa82f9fdff30517603b2e2c5376b34b106d353c2b508262260d3bb0d2c21ba
+    command: [redis-server, --appendonly, "yes", --maxmemory, 128mb, --maxmemory-policy, noeviction]
+    volumes:
+      - redis-data:/data
+    networks: [internal]
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    cpus: 0.5
+    mem_limit: 256m
+    pids_limit: 64
+  migrate:
+    <<: *backend
+    command: [sh, -c, "python manage.py migrate --noinput && python manage.py load_learning_content"]
+    depends_on:
+      postgres: {condition: service_healthy}
+      initialize-imports: {condition: service_completed_successfully}
+  api:
+    <<: *backend
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen(urllib.request.Request('http://127.0.0.1:8000/api/v1/jobs/', headers={'Host':'127.0.0.1:5173'}), timeout=3).close()"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+  worker:
+    <<: *backend
+    command: [celery, -A, config.celery:app, worker, --loglevel=WARNING, --concurrency=1, --without-gossip, --without-mingle]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      redis: {condition: service_healthy}
+  reconciler:
+    <<: *backend
+    command: [python, manage.py, reconcile_jobs, --loop]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+  frontend:
+    image: learning-lab-frontend:m1-t02
+    build:
+      context: .
+      dockerfile: infra/docker/frontend.Dockerfile
+    environment:
+      APP_AUTHORITY: 127.0.0.1:5173
+    ports:
+      - "127.0.0.1:5173:8080"
+    networks: [internal, entry]
+    depends_on:
+      api: {condition: service_healthy}
+    cpus: 0.5
+    mem_limit: 128m
+    pids_limit: 64
+
+networks:
+  task-board-internal: {internal: true}
+  task-board-entry: {}
+  internal: {internal: true}
+  entry: {}
+
+volumes:
+  import-data: {}
+  task-board-data: {}
+  task-board-secrets: {}
+  postgres-data: {}
+  redis-data: {}
+  local-secrets: {}

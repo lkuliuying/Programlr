@@ -1,0 +1,25 @@
+# 必须配合独立项目名 learning-lab-m3-verify 使用，避免触及日常工作台。
+x-m3-environment: &m3-environment
+  APP_PORT: "5175"
+  APP_ORIGIN: http://127.0.0.1:5175
+services:
+  migrate:
+    image: learning-lab-backend:m3-verify
+    environment: *m3-environment
+  api:
+    image: learning-lab-backend:m3-verify
+    environment: *m3-environment
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen(urllib.request.Request('http://127.0.0.1:8000/api/v1/jobs/', headers={'Host':'127.0.0.1:5175'}), timeout=3).close()"]
+  worker:
+    image: learning-lab-backend:m3-verify
+    environment: *m3-environment
+  reconciler:
+    image: learning-lab-backend:m3-verify
+    environment: *m3-environment
+  frontend:
+    image: learning-lab-frontend:m3-verify
+    environment:
+      APP_AUTHORITY: 127.0.0.1:5175
+    ports: !override
+      - "127.0.0.1:5175:8080"

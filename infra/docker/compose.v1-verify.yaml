@@ -1,0 +1,34 @@
+# 由 v1.0 验收入口管理的独立回环项目，模型保持关闭。
+x-v1-environment: &v1-environment
+  APP_PORT: "5181"
+  APP_ORIGIN: http://127.0.0.1:5181
+  MODEL_BASE_URL: ""
+  MODEL_NAME: ""
+  MODEL_API_KEY: ""
+services:
+  migrate:
+    image: learning-lab-backend:1.0.0
+    environment: *v1-environment
+  api:
+    image: learning-lab-backend:1.0.0
+    environment: *v1-environment
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen(urllib.request.Request('http://127.0.0.1:8000/api/v1/knowledge-curricula/', headers={'Host':'127.0.0.1:5181'}), timeout=3).close()"]
+  worker:
+    image: learning-lab-backend:1.0.0
+    environment: *v1-environment
+  reconciler:
+    image: learning-lab-backend:1.0.0
+    environment: *v1-environment
+  frontend:
+    image: learning-lab-frontend:1.0.0
+    environment:
+      APP_AUTHORITY: 127.0.0.1:5181
+    ports: !override
+      - "127.0.0.1:5181:8080"
+  task-board-migrate:
+    image: learning-lab-task-board-backend:v1-verify
+  task-board-api:
+    image: learning-lab-task-board-backend:v1-verify
+  lab-reconciler:
+    image: learning-lab-task-board-backend:v1-verify

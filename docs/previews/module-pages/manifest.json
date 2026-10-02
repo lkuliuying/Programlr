@@ -1,0 +1,100 @@
+{
+  "source": "test/task-board.zip",
+  "sourceVersion": "task-board/1.0.0",
+  "designViewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "type": "design-preview",
+  "note": "设计预览，采用1440×900布局比例；图片中的示意内容不代表已执行分析、实验、模型调用或新增API承诺。实际页面仅展示现有API返回的证据。",
+  "pages": [
+    {
+      "section": "workbench",
+      "title": "工作台",
+      "file": "workbench.png",
+      "width": 1586,
+      "height": 992,
+      "sha256": "0a98750cafd21a47e7e7052513bad4cccb0d444d7b35f92d7c38d2c285ea7805"
+    },
+    {
+      "section": "import",
+      "title": "项目导入",
+      "file": "import.png",
+      "width": 1586,
+      "height": 992,
+      "sha256": "09985ab241225c5aab1ba2f4340f5c5f473db9962a42981bafef1adeff07d892"
+    },
+    {
+      "section": "source",
+      "title": "源码阅读",
+      "file": "source.png",
+      "width": 1586,
+      "height": 992,
+      "sha256": "ac07459899cad8024c14d3adb23164cd75aa9d16b6b574e94e6b7c3a5eb9b377"
+    },
+    {
+      "section": "api",
+      "title": "API 分析",
+      "file": "api.png",
+      "width": 1586,
+      "height": 992,
+      "sha256": "fba111cc46c8cc68576168666a390b0010c15477c8ad6e8935d879e0f4ef9983"
+    },
+    {
+      "section": "graph",
+      "title": "静态关系图",
+      "file": "graph.png",
+      "width": 1586,
+      "height": 992,
+      "sha256": "1798f9de29065a95d599eb09d08b1fc68de39dddafa210c7e46c97a5fc9b216f"
+    },
+    {
+      "section": "comparison",
+      "title": "快照与对比",
+      "file": "comparison.png",
+      "width": 1586,
+      "height": 992,
+      "sha256": "e91196e47344adec7e6871e52101e5e5bc70d48b75f35a179fe0919b98bec8ac"
+    },
+    {
+      "section": "impact",
+      "title": "候选影响",
+      "file": "impact.png",
+      "width": 1586,
+      "height": 992,
+      "sha256": "39b0e8a4210a638bbded352ee11b3b809114e39841271c77ecd4567f8264a8bd"
+    },
+    {
+      "section": "learning",
+      "title": "知识与学习",
+      "file": "learning.png",
+      "width": 1586,
+      "height": 992,
+      "sha256": "aceb81706935a490c36a003598e3e4421f4ca0d861fe13765c2fc99d229e10ce"
+    },
+    {
+      "section": "labs",
+      "title": "练习与实验",
+      "file": "labs.png",
+      "width": 1586,
+      "height": 992,
+      "sha256": "963cf0d7a25604260d13b05be2e1249c77d2575e460108694c4683f9a5fc4f50"
+    },
+    {
+      "section": "explanation",
+      "title": "模型讲解",
+      "file": "explanation.png",
+      "width": 1586,
+      "height": 992,
+      "sha256": "d9f3389def6d1f10a6a3508c36e40b5ef2bc8b4c60dcf5b83737db5f0117966f"
+    },
+    {
+      "section": "jobs",
+      "title": "系统与任务",
+      "file": "jobs.png",
+      "width": 1586,
+      "height": 992,
+      "sha256": "cc78387974097c879ac994995372d7be4a4ac5f921bd912e73341f97d97a7646"
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+# 显式读取根目录 .env；密钥仅注入 Worker，不注入 API 或前端。
+# Windows Compose 的环境源 secret 创建受限；独立文件挂载仍使用 compose.model.yaml。
+x-model-environment: &model-environment
+  MODEL_BASE_URL: ${MODEL_BASE_URL:-}
+  MODEL_NAME: ${MODEL_NAME:-}
+services:
+  api:
+    environment: *model-environment
+  worker:
+    environment:
+      <<: *model-environment
+      MODEL_API_KEY: ${MODEL_API_KEY:?请在根目录 .env 中填写 MODEL_API_KEY}
+    networks: [internal, model-egress]
+networks:
+  model-egress: {}

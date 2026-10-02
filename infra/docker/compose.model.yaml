@@ -1,0 +1,18 @@
+# 仅在用户显式选择模型服务并准备凭据后加载；未配置目标时不可提交。
+x-model-environment: &model-environment
+  MODEL_BASE_URL: ${MODEL_BASE_URL:-}
+  MODEL_NAME: ${MODEL_NAME:-}
+services:
+  api:
+    environment: *model-environment
+  worker:
+    environment:
+      <<: *model-environment
+      MODEL_API_KEY_FILE: /run/secrets/model_api_key
+    secrets: [model_api_key]
+    networks: [internal, model-egress]
+networks:
+  model-egress: {}
+secrets:
+  model_api_key:
+    file: ${MODEL_API_KEY_FILE:?请通过进程环境指定本地密钥文件路径}

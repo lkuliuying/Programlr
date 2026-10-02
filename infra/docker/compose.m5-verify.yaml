@@ -1,0 +1,58 @@
+# 独立 M5 验收项目；只启动 README 指定服务，不发布内部实验服务。
+x-m5-environment: &m5-environment
+  APP_PORT: "5177"
+  APP_ORIGIN: http://127.0.0.1:5177
+  MODEL_BASE_URL: ""
+  MODEL_NAME: ""
+services:
+  migrate:
+    image: learning-lab-backend:m5-verify
+    environment: *m5-environment
+  api:
+    image: learning-lab-backend:m5-verify
+    environment: *m5-environment
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen(urllib.request.Request('http://127.0.0.1:8000/api/v1/jobs/', headers={'Host':'127.0.0.1:5177'}), timeout=3).close()"]
+  worker:
+    image: learning-lab-backend:m5-verify
+    environment: *m5-environment
+    networks: [internal, task-board-internal]
+  reconciler:
+    image: learning-lab-backend:m5-verify
+    environment: *m5-environment
+  frontend:
+    image: learning-lab-frontend:m5-verify
+    environment:
+      APP_AUTHORITY: 127.0.0.1:5177
+    ports: !override
+      - "127.0.0.1:5177:8080"
+  task-board-api:
+    image: learning-lab-task-board-backend:m5-verify
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.labs
+  task-board-migrate:
+    image: learning-lab-task-board-backend:m5-verify
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.labs
+  lab-reconciler:
+    image: learning-lab-task-board-backend:m5-verify
+    profiles: [task-board]
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.labs
+      DJANGO_SECRET_KEY_FILE: /run/local-secrets/django_key
+      DATABASE_PASSWORD_FILE: /run/local-secrets/database_password
+    volumes:
+      - task-board-secrets:/run/local-secrets:ro
+    networks: [task-board-internal]
+    depends_on:
+      task-board-migrate: {condition: service_completed_successfully}
+    cpus: 0.25
+    mem_limit: 128m
+    pids_limit: 64
+    init: true
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    command: [python, manage.py, reconcile_lab_runs, --loop]
+    healthcheck:
+      disable: true

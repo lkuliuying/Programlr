@@ -1,0 +1,10 @@
+# 只叠加到独立 M4/M5 验收项目；固定替身无凭据、无出口、无计费调用。
+x-double: &double
+  MODEL_BASE_URL: https://model-test.invalid/v1
+  MODEL_NAME: m4-test-double
+services:
+  api:
+    environment: *double
+  worker:
+    environment: *double
+    command: [python, -m, apps.explanations.tests.double_worker]

@@ -12,6 +12,7 @@ export const workspaceSections = [
   'learning',
   'labs',
   'explanation',
+  'system',
   'jobs',
 ] as const;
 export type WorkspaceSection = (typeof workspaceSections)[number];

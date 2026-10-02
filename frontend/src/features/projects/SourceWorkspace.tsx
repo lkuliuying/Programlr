@@ -152,6 +152,11 @@ export function SourceWorkspace({
 }) {
   const [treeOpen, setTreeOpen] = useState(false),
     [activeWindow, setWindow] = useState<'primary' | 'secondary'>('primary');
+  const [previousSearch, setPreviousSearch] = useState(search);
+  if (previousSearch !== search) {
+    setPreviousSearch(search);
+    if (search.trim()) setTreeOpen(true);
+  }
   const treeButton = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     function escape(event: KeyboardEvent) {

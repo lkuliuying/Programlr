@@ -2,7 +2,7 @@
 
 | 项目 | 内容 |
 | --- | --- |
-| 文档版本 | v0.29 |
+| 文档版本 | v0.30 |
 | 文档状态 | v0.1–v0.3 及 v1.0 稳定性/验收工程已建立；实际验收与限制见所属阶段计划 |
 | 更新日期 | 2026-10-02 |
 | 适用阶段 | v0.1 首版及后续按职责扩展 |
@@ -318,8 +318,8 @@ M11–M15 的唯一任务进度、恢复与验收来源是[第三阶段计划](p
 | --- | --- |
 | `frontend/public/theme-init.js`、`index.html` | 同源首屏主题引导；不执行内联脚本、不改变 CSP |
 | `frontend/src/app/ThemeProvider.tsx`、`global.css` | 偏好与 Ant Design/语义样式统一，覆盖错误恢复页 |
-| `frontend/src/app/WorkspaceShell.tsx`、`workspace.css` | 顶栏、功能导航、响应式外壳和局部滚动，使用 shared 本地 SVG |
-| `frontend/src/app/WorkspaceModulePages.tsx`、`WorkspacePage.tsx`、`workspace-location.ts` | 11 个独立页面容器与 feature 公开入口组合；共享项目/快照元数据、section 和两个引用恢复、对象切换及单实例表单 |
+| `frontend/src/app/WorkspaceShell.tsx`、`workspace.css` | 顶栏、功能导航和固定可视高度外壳，使用 shared 本地 SVG |
+| `frontend/src/app/WorkspaceModulePages.tsx`、`WorkspacePage.tsx`、`workspace-location.ts` | 12 个独立页面容器与 feature 公开入口组合；共享项目/快照元数据、section 和两个引用恢复、对象切换及单实例表单 |
 | `frontend/src/features/projects/SourceWorkspace.tsx`、`SourceViewer.tsx`、`source-highlight.tsx` | 校验清单目录、手动固定、独立分段和只读文本着色 |
 | `frontend/src/features/projects/SnapshotTimeline.tsx`、`SnapshotNameForm.tsx`、`snapshot-name.ts` | 快照名称和日期分行时间线、显式服务端命名与统一显示；UUID 仅用于资源归属 |
 | `frontend/src/features/analysis/AnalysisBrowser.tsx` | API 清单、接口处理对象、前端请求来源与诊断；不挂载关系画布或候选决定 |
@@ -327,14 +327,14 @@ M11–M15 的唯一任务进度、恢复与验收来源是[第三阶段计划](p
 | `frontend/src/features/analysis/CandidateImpactPanel.tsx`、`ImpactPanel.tsx`、`RelationReviews.tsx` | 起点与影响路径、候选开关和人工决定；由专属候选影响页组合 |
 | `frontend/src/features/learning/KnowledgePanel.tsx`、`LearningPathPanel.tsx` | 独立知识卡片、课程/目标与先修路径；无接口时可读全局卡片，不包含作答表单 |
 | `frontend/src/features/learning/LearningPanel.tsx`、`AttemptReviewPanel.tsx` | 固定题、作答反馈/历史、重新练习与自评；由 app 与 labs 组合为练习页，不再读取知识卡片或课程 |
-| `frontend/src/features/jobs/JobsPage.tsx`、`SystemStatusSummary.tsx` | 显式基础检查历史及时间；列表/结果查询和轮询随页面 active 停用，不作后台持续监控 |
+| `frontend/src/features/jobs/JobsPage.tsx`、`SystemStatusPage.tsx`、`SystemStatusSummary.tsx` | 历史、显式检查与检查摘要分别负责；查询和轮询随页面 active 停用，不作后台持续监控 |
 | `frontend/src/shared/components/Icon.tsx` | 本地受控 SVG 图标与标识，不请求第三方资源 |
 
-11 个页面分别承载工作台、导入、源码、API、关系图、快照与对比、候选影响、知识、练习与实验、模型讲解、系统任务。工作台只保留准备摘要和下一步入口；`AnalysisOverview`、`KnowledgeSummary` 等既有摘要组件仍保留，但当前工作台不挂载完整图和知识区域。
+12 个页面分别承载工作台、导入、源码、API、关系图、快照与对比、候选影响、知识、练习与实验、模型讲解、系统状态、任务历史。工作台只保留准备摘要和下一步入口；`AnalysisOverview`、`KnowledgeSummary` 等既有摘要组件仍保留，但当前工作台不挂载完整图和知识区域。
 
 功能页通过单实例 `hidden` 切换保留同一对象草稿，项目、快照、分析与接口变化时按键隔离。图节点选择保持当前模块；所属接口改变时清理旧预览、讲解、作答、实验、课程目标、panel 和 job，保留同快照源码位置。`section` 优先于旧选择；无 section 的 `panel=learning` 依据作答及课程/目标归属恢复练习或知识，独立作答/实验资源进入练习页。独立源码页在窗口宽度至少 1200px 时并排双窗口，位置仍沿用 URL 引用。
 
-保持 `app → features → shared`；没有增加 API、依赖、迁移、运行能力或外发方式。工程状态和验证唯一归属第四阶段计划 M21；`.runtime/ui-redesign-20261001` 仅为忽略的原件/测试/截图证据，不是新记忆系统。[模块预览索引](previews/module-pages/index.html)保存生成设计图，与实际浏览器验收证据分别说明。
+保持 `app → features → shared`；没有增加 API、依赖、迁移、运行能力或外发方式。工程状态和验证分别归属第四阶段计划 M21–M23；`.runtime/ui-redesign-20261001` 仅为忽略的原件/测试/截图证据，不是新记忆系统。[模块预览索引](previews/module-pages/index.html)保存生成设计图，与实际浏览器验收证据分别说明。
 
 ### M22 用户视角迭代职责
 
@@ -343,6 +343,12 @@ M11–M15 的唯一任务进度、恢复与验收来源是[第三阶段计划](p
 `WorkspaceModulePages.tsx` 中的 `WorkbenchPage` 只基于 app 传入的已校验资源决定准备步骤与摘要；`WorkspacePage` 传递加载/失败状态并继续拥有 URL 和共享查询。`WorkspaceShell` 内部复用导航组件，承担窄屏原生模态菜单和品牌返回的焦点/历史行为。新增两份同目录测试分别验证首页状态与菜单交互，保留 `app → features → shared` 和原表单单实例。
 
 本地 Git 按用户明确授权建立 main，现有工程分组留存基线，后续按功能提交；敏感配置、运行证据、IDE、依赖和构建物保持忽略。任务和实测只见[第四阶段计划 M22](phase-4-plan.md#user-review)，不建立其他项目记忆系统。
+
+### M23 分页与系统模块职责
+
+`shared/components/ContentPager.tsx`、`ContentPager.css` 负责同一内容树的可视页、焦点定位和尺寸观察，`content-pagination.ts` 只计算页范围；对应测试覆盖首尾、并列断点、尺寸变化与草稿。`app/pagination.css` 将原内部纵向滚动纳入页面分页，保持必要横向查看。快照命名复用共享分页，不复制表单；源码搜索展开文件入口。
+
+jobs 公共出口新增 `SystemStatusPage`，检查提交、恢复与结果从 `JobsPage` 分离；历史保留原列表 API 和批次参数，沿 History API 保存上下文。`section=system` 与 `section=jobs` 独立，旧 `view=jobs` 继续有效。未新增后端、协议、依赖或持久化字段，任务与证据唯一见[第四阶段计划 M23](phase-4-plan.md#viewport-pagination)。
 
 ## 8. 修订记录
 
@@ -376,3 +382,4 @@ M11–M15 的唯一任务进度、恢复与验收来源是[第三阶段计划](p
 | v0.27 | 2026-10-01 | 同步 11 个模块页面容器、API/图/影响与知识/作答分工、单实例草稿及旧链接归属 | 不改契约、依赖或运行边界；实际模块验证唯一见第四阶段计划 |
 | v0.28 | 2026-10-01 | 同步服务端快照名称与图内展示职责，当前契约 57 项 | 不改变源码存储或依赖；验证唯一见第四阶段计划 |
 | v0.29 | 2026-10-02 | 同步共享导入校验、准备状态、模态导航及本地 Git 归属 | 不增加 API 或依赖；实际验证唯一见第四阶段计划 M22 |
+| v0.30 | 2026-10-02 | 同步共享内容分页、12 个模块及系统检查/历史边界 | 无后端、契约或依赖变更；验证唯一见第四阶段计划 M23 |

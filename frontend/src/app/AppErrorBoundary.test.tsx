@@ -32,6 +32,6 @@ test('渲染失败显示恢复入口，不展示原始错误或自动重新提�
   fireEvent.click(screen.getByRole('button', { name: '重新加载当前工作区' }));
   expect(reload).toHaveBeenCalledTimes(1);
   expect(
-    screen.getByRole('link', { name: '查看系统与任务' }).getAttribute('href'),
+    screen.getByRole('link', { name: '查看任务历史' }).getAttribute('href'),
   ).toBe('?view=jobs');
 });

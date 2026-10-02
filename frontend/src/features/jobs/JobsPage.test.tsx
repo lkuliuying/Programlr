@@ -1,5 +1,6 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -8,13 +9,72 @@ import {
 } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { JobsPage } from './JobsPage';
+import { SystemStatusPage } from './SystemStatusPage';
 
 afterEach(() => {
   cleanup();
   sessionStorage.clear();
+  window.history.replaceState({}, '', '/');
   vi.unstubAllGlobals();
 });
-function show() {
+
+test('记录翻页保留项目和快照，并能通过浏览器历史返回', async () => {
+  const project = '9d8df4d4-d2c7-4c58-886d-8f0084f29652';
+  const snapshot = 'ad8df4d4-d2c7-4c58-886d-8f0084f29652';
+  window.history.replaceState(
+    {},
+    '',
+    `?project=${project}&snapshot=${snapshot}&section=jobs`,
+  );
+  const fetcher = vi.fn(
+    async (path: string) =>
+      new Response(
+        JSON.stringify({
+          count: 21,
+          results: [],
+          previous: path.includes('page=2&')
+            ? '/api/v1/jobs/?page=1&page_size=20'
+            : null,
+          next: path.includes('page=2&')
+            ? null
+            : '/api/v1/jobs/?page=2&page_size=20',
+        }),
+      ),
+  );
+  vi.stubGlobal('fetch', fetcher);
+  show();
+  fireEvent.click(await screen.findByRole('button', { name: '下一批记录' }));
+  await screen.findByText('第 2 批 · 每批最多 20 条');
+  expect(new URLSearchParams(window.location.search).get('project')).toBe(
+    project,
+  );
+  expect(new URLSearchParams(window.location.search).get('snapshot')).toBe(
+    snapshot,
+  );
+  expect(
+    fetcher.mock.calls.some(
+      ([path]) => path === '/api/v1/jobs/?page=2&page_size=20',
+    ),
+  ).toBe(true);
+  act(() => window.history.back());
+  await screen.findByText('第 1 批 · 每批最多 20 条');
+});
+
+test('旧任务历史链接继续读取指定批次，系统检查不混入任务历史', async () => {
+  window.history.replaceState({}, '', '?view=jobs&page=2');
+  const fetcher = vi.fn<typeof fetch>(
+    async () =>
+      new Response(
+        JSON.stringify({ count: 0, results: [], next: null, previous: null }),
+      ),
+  );
+  vi.stubGlobal('fetch', fetcher);
+  show();
+  await screen.findByText('第 2 批 · 每批最多 20 条');
+  expect(fetcher.mock.calls[0]?.[0]).toBe('/api/v1/jobs/?page=2&page_size=20');
+  expect(screen.queryByRole('button', { name: '开始基础检查' })).toBeNull();
+});
+function show(system = false) {
   return render(
     <QueryClientProvider
       client={
@@ -26,7 +86,7 @@ function show() {
         })
       }
     >
-      <JobsPage />
+      {system ? <SystemStatusPage onHistory={vi.fn()} /> : <JobsPage />}
     </QueryClientProvider>,
   );
 }
@@ -43,8 +103,11 @@ test('无任务时呈现真实空状态', async () => {
   );
   show();
   expect(
-    await screen.findByText('还没有任务。开始一次基础检查，建立第一条记录。'),
+    await screen.findByText(
+      '还没有任务。可在系统状态开始基础检查，或在项目导入中导入源码。',
+    ),
   ).toBeTruthy();
+  expect(screen.queryByRole('button', { name: '开始基础检查' })).toBeNull();
 });
 test('未知提交结果在重新挂载后用原键恢复', async () => {
   const keys: string[] = [];
@@ -64,11 +127,11 @@ test('未知提交结果在重新挂载后用原键恢复', async () => {
       );
     }),
   );
-  const view = show();
+  const view = show(true);
   fireEvent.click(screen.getByRole('button', { name: '开始基础检查' }));
   await waitFor(() => expect(keys).toHaveLength(1));
   view.unmount();
-  show();
+  show(true);
   fireEvent.click(screen.getByRole('button', { name: '恢复这次提交' }));
   await waitFor(() => expect(keys).toHaveLength(2));
   expect(keys[0]).toBe(keys[1]);

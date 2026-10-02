@@ -15,7 +15,8 @@ export const navigation = [
   ['learning', '知识与学习'],
   ['labs', '练习与实验'],
   ['explanation', '模型讲解'],
-  ['jobs', '系统与任务'],
+  ['system', '系统状态'],
+  ['jobs', '任务历史'],
 ] as const;
 function NavigationLinks({
   section,
@@ -156,7 +157,7 @@ export function WorkspaceShell({
         <button
           className="icon-button header-jobs"
           aria-label="查看任务历史"
-          title="系统与任务"
+          title="任务历史"
           onClick={() => onSection('jobs')}
         >
           <Icon name="jobs" />

@@ -109,7 +109,7 @@ test('菜单打开时搜索快捷键不移动到背景，放大窗口后解除�
 test('Tab 和 Shift Tab 在菜单首尾循环，不把焦点送到背景或浏览器工具栏', () => {
   const { dialog } = setup();
   const first = within(dialog).getByRole('button', { name: '关闭功能导航' });
-  const last = within(dialog).getByRole('button', { name: '系统与任务' });
+  const last = within(dialog).getByRole('button', { name: '任务历史' });
   last.focus();
   fireEvent.keyDown(last, { key: 'Tab' });
   expect(document.activeElement).toBe(first);

@@ -5,21 +5,27 @@ import type {
   SourceFile,
 } from '../shared/api/generated/schema';
 import { Icon } from '../shared/components/Icon';
+import { ContentPager } from '../shared/components/ContentPager';
 import { snapshotDisplayName } from '../features/projects';
 import type { WorkspaceSection } from './workspace-location';
 
-type PageProps = { active: boolean; children: ReactNode };
+type PageProps = { active: boolean; children: ReactNode; context?: string };
 function ModulePage({
   active,
   section,
   title,
   description,
   children,
+  context = '',
 }: PageProps & {
   section: WorkspaceSection;
   title: string;
   description: string;
 }) {
+  const params = new URLSearchParams(window.location.search);
+  params.delete('section');
+  params.delete('view');
+  params.sort();
   return (
     <section
       hidden={!active}
@@ -34,7 +40,15 @@ function ModulePage({
           <p>{description}</p>
         </div>
       </header>
-      <div className="module-content">{children}</div>
+      <div className="module-content">
+        <ContentPager
+          active={active}
+          label={title}
+          resetKey={params.toString() + '|' + context}
+        >
+          {children}
+        </ContentPager>
+      </div>
     </section>
   );
 }
@@ -237,8 +251,11 @@ export function WorkbenchPage({
                 先浏览知识卡片
                 <Icon name="arrow" />
               </button>
-              <button className="text-button" onClick={() => onSection('jobs')}>
-                查看系统与任务
+              <button
+                className="text-button"
+                onClick={() => onSection('system')}
+              >
+                查看系统状态
               </button>
             </div>
           </section>
@@ -341,9 +358,19 @@ export function SystemPage(props: PageProps) {
   return (
     <ModulePage
       {...props}
+      section="system"
+      title="系统状态"
+      description="显式检查本地基础链路，核对数据库、队列与 Worker 的检查结果。"
+    />
+  );
+}
+export function TaskHistoryPage(props: PageProps) {
+  return (
+    <ModulePage
+      {...props}
       section="jobs"
-      title="系统与任务"
-      description="显式检查环境，追踪任务的持久化状态与结果。"
+      title="任务历史"
+      description="按时间查看执行记录、失败原因与任务结果。"
     />
   );
 }

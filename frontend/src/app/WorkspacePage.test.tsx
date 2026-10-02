@@ -580,7 +580,10 @@ test('学习目标保留时实验面板刷新及前进后退恢复显式选择',
   );
   await screen.findByRole('heading', { name: '知识与学习', level: 1 });
   fireEvent.click(screen.getByRole('button', { name: '练习与实验' }));
-  fireEvent.click(await screen.findByRole('button', { name: '受控实验' }));
+  const panels = await screen.findByRole('navigation', {
+    name: '练习与实验内容',
+  });
+  fireEvent.click(within(panels).getByRole('button', { name: '受控实验' }));
   await screen.findByRole('button', { name: '受控实验', pressed: true });
   const search = window.location.search;
   expect(readSelection(search).panel).toBe('lab');
@@ -761,7 +764,7 @@ test('接口范围图跨接口选择仍清理旧接口记录，保留同快照�
   expect(await screen.findByRole('button', { name: '查看全图' })).toBeTruthy();
 });
 
-test('无项目时 11 个模块各自显示唯一页面与专属引导', async () => {
+test('无项目时 12 个模块各自显示唯一页面与专属引导', async () => {
   vi.stubGlobal(
     'fetch',
     vi.fn(async (path: string) => response(reads(path))),
@@ -797,12 +800,30 @@ test('无项目时 11 个模块各自显示唯一页面与专属引导', async (
       expect(
         within(current).getByRole('region', { name: '知识卡片' }),
       ).toBeTruthy();
-    if (label === '系统与任务')
+    if (label === '系统状态')
       expect(
         within(current).getByRole('button', { name: '开始基础检查' }),
       ).toBeTruthy();
   }
 });
+
+test.each(['?section=jobs', '?view=jobs&page=2'])(
+  '任务入口 %s 不包含系统检查表单',
+  async (search) => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (path: string) => response(reads(path))),
+    );
+    show(search);
+    expectModule('任务历史');
+    await screen.findByText('源码分析');
+    expect(screen.queryByRole('button', { name: '开始基础检查' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '系统状态' }));
+    expectModule('系统状态');
+    expect(screen.getByRole('button', { name: '开始基础检查' })).toBeTruthy();
+    expect(screen.queryByRole('region', { name: '任务记录' })).toBeNull();
+  },
+);
 
 test('缺少快照时各模块指明自身前置，知识卡片仍可读', async () => {
   vi.stubGlobal(
@@ -890,7 +911,7 @@ test('已选分析未选接口时讲解与练习分别引导，图和 API 保持
   expect(screen.queryByRole('region', { name: 'API 分析详情' })).toBeNull();
 });
 
-test('真实练习草稿跨 11 页与双主题保留，知识内容与作答独立且不自动提交', async () => {
+test('真实练习草稿跨 12 页与双主题保留，知识内容与作答独立且不自动提交', async () => {
   vi.stubGlobal('crypto', webcrypto);
   const exercise = {
     id: '00000000-0000-0000-0000-000000000009',
@@ -996,7 +1017,7 @@ test('项目名称与根路由草稿跨模块和主题保留，不触发创建�
     await screen.findByRole('combobox', { name: '根路由文件' }),
     { target: { value: 'root_urls.py' } },
   );
-  fireEvent.click(screen.getByRole('button', { name: '系统与任务' }));
+  fireEvent.click(screen.getByRole('button', { name: '系统状态' }));
   fireEvent.click(screen.getByRole('button', { name: '切换为浅色模式' }));
   fireEvent.click(screen.getByRole('button', { name: '项目导入' }));
   expect(
@@ -1186,7 +1207,7 @@ test('点击品牌返回工作台保留项目快照和未提交表单，不重�
   expect(writes).toEqual([]);
 });
 
-test('快照命名草稿仅在导入和对比页可见，跨 11 页与双主题保留且不自动写入', async () => {
+test('快照命名草稿仅在导入和对比页可见，跨 12 页与双主题保留且不自动写入', async () => {
   const writes: string[] = [];
   const savedName = '任务簿创建任务基线';
   vi.stubGlobal(
@@ -1207,7 +1228,8 @@ test('快照命名草稿仅在导入和对比页可见，跨 11 页与双主题�
   show(
     `?project=${project}&snapshot=${snapshot}&analysis=${analysis}&endpoint=0&section=import&file=root_urls.py&start=1&end=1&file2=root_urls.py&start2=1&end2=1`,
   );
-  fireEvent.click(await screen.findByRole('button', { name: '命名当前快照' }));
+  await screen.findByText('命名当前快照');
+  fireEvent.click(screen.getByRole('button', { name: '命名当前快照' }));
   fireEvent.change(await screen.findByRole('textbox', { name: '快照名称' }), {
     target: { value: '尚未保存的任务簿快照' },
   });

@@ -1,16 +1,33 @@
 import { useQuery } from '@tanstack/react-query';
 import { Icon } from '../../shared/components/Icon';
 import { getCheck, listJobs } from './api/jobs-api';
-export function SystemStatusSummary({ onOpen }: { onOpen: () => void }) {
+export function SystemStatusSummary({
+  onOpen,
+  active = true,
+}: {
+  onOpen: () => void;
+  active?: boolean;
+}) {
   const jobs = useQuery({
     queryKey: ['jobs', 1],
     queryFn: ({ signal }) => listJobs(1, signal),
+    enabled: active,
+    refetchInterval: (query) =>
+      active &&
+      query.state.data?.results.some(
+        (job) =>
+          job.kind === 'system_check' &&
+          ['queued', 'running'].includes(job.status),
+      )
+        ? 1500
+        : false,
+    refetchIntervalInBackground: false,
   });
   const latest = jobs.data?.results.find((job) => job.kind === 'system_check');
   const result = useQuery({
     queryKey: ['system-check', latest?.result_url ?? null],
     queryFn: ({ signal }) => getCheck(latest!.result_url!, signal),
-    enabled: latest?.status === 'succeeded' && !!latest.result_url,
+    enabled: active && latest?.status === 'succeeded' && !!latest.result_url,
   });
   const label = result.data
     ? '通过'

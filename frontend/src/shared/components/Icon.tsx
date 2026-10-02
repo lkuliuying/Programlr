@@ -16,6 +16,7 @@ const paths = {
   labs: ['M8 2h8M10 2v7L4 19q-1 3 2 3h12q3 0 2-3L14 9V2', 'M7 16h10'],
   explanation: ['M5 3h14v16H9l-4 3z', 'M8 7h8M8 11h8M8 15h5'],
   jobs: ['M4 5h16v16H4zM9 2h6v6H9z', 'm8 13 2 2 5-5'],
+  system: ['M3 4h18v12H3zM8 21h8M12 16v5', 'm6 10 3-3 4 6 4-5 2 2'],
   folder: ['M3 5h7l2 3h9v13H3z'],
   file: ['M5 2h9l5 5v15H5zM14 2v6h5', 'M8 12h8m-8 4h6'],
   search: ['M16 10a6 6 0 1 1-12 0 6 6 0 0 1 12 0', 'm15 15 6 6'],

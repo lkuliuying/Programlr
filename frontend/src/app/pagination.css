@@ -1,0 +1,139 @@
+/* 页面统一按可视高度分页，内部内容参与测量，避免双重纵向滚动。 */
+.paged-content .source-workspace,
+.paged-content .file-tree-panel,
+.paged-content .file-tree,
+.paged-content .source-lines,
+.paged-content .workspace-learning-panels,
+.paged-content .diagram-scroll,
+.paged-content pre {
+  height: auto;
+  min-height: 0;
+  max-height: none;
+}
+.paged-content .source-workspace {
+  align-items: start;
+}
+.paged-content .source-lines,
+.paged-content .diagram-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.paged-content .file-tree,
+.paged-content .workspace-learning-panels,
+.paged-content pre {
+  overflow: visible;
+}
+.paged-content .source-lines {
+  flex: none;
+}
+.paged-content textarea {
+  max-height: 160px;
+}
+.paged-content .graph-workspace .graph-stage {
+  display: flex;
+  flex-direction: column;
+}
+.paged-content .graph-workspace .graph-inspector {
+  position: static;
+  order: -1;
+  width: 100%;
+  max-height: none;
+  overflow: visible;
+  box-shadow: none;
+  border-width: 1px 0;
+}
+.paged-content .graph-workspace .graph-coverage > div {
+  position: static;
+  max-height: none;
+  overflow: visible;
+}
+.system-status-page > * + * {
+  margin-top: 18px;
+}
+.task-history {
+  padding: 12px 18px;
+}
+.task-history .job-list li {
+  padding: 18px 0;
+}
+.system-status-page .system-status-summary {
+  flex-wrap: wrap;
+}
+.snapshot-name-form {
+  height: min(360px, calc(100dvh - 200px));
+}
+.snapshot-name-form .paged-content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.snapshot-name-form .content-pagination {
+  padding-top: 7px;
+}
+.snapshot-name-form .content-page-hint {
+  display: none;
+}
+.snapshot-name-form .content-pagination label {
+  width: 100px;
+}
+.snapshot-name-form .content-pagination button {
+  padding: 6px;
+}
+@media (max-width: 1199px) {
+  .paged-content .source-workspace {
+    grid-template-rows: none;
+  }
+  .paged-content .file-tree-panel {
+    position: static;
+    width: 100%;
+  }
+}
+@media (max-width: 767px) {
+  .paged-content .source-lines pre {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+}
+@media (max-height: 700px) {
+  .app-sidebar nav button {
+    height: 34px;
+  }
+  .module-heading {
+    padding-top: 8px;
+    padding-bottom: 10px;
+  }
+  .module-heading h1 {
+    font-size: 23px;
+  }
+  .module-heading p {
+    font-size: 12px;
+  }
+  .navigation-dialog nav button {
+    min-height: 34px;
+    margin: 0;
+  }
+  .navigation-dialog header {
+    margin-bottom: 10px;
+  }
+}
+@media (max-height: 540px) {
+  .app-sidebar nav button {
+    height: 28px;
+    font-size: 11px;
+  }
+  .app-sidebar {
+    padding-top: 4px;
+    padding-bottom: 4px;
+  }
+  .navigation-dialog {
+    width: min(520px, calc(100vw - 32px));
+  }
+  .navigation-dialog ul {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .navigation-dialog nav button {
+    gap: 6px;
+    font-size: 12px;
+  }
+}

@@ -26,7 +26,7 @@ export class AppErrorBoundary extends Component<Props, State> {
         >
           重新加载当前工作区
         </button>
-        <a href="?view=jobs">查看系统与任务</a>
+        <a href="?view=jobs">查看任务历史</a>
       </main>
     );
   }

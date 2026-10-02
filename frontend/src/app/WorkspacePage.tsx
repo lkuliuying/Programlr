@@ -26,7 +26,7 @@ import {
   StaticGraphPanel,
   CandidateImpactPanel,
 } from '../features/analysis';
-import { JobStatus, JobsPage, SystemStatusSummary } from '../features/jobs';
+import { JobStatus, JobsPage, SystemStatusPage } from '../features/jobs';
 import { ExplanationPanel } from '../features/explanations';
 import { LabPanel } from '../features/labs';
 import { LearningPanel, KnowledgePanel } from '../features/learning';
@@ -49,9 +49,11 @@ import {
   PracticePage,
   ExplanationPage,
   SystemPage,
+  TaskHistoryPage,
   ModuleRequirement,
 } from './WorkspaceModulePages';
 import './workspace.css';
+import './pagination.css';
 
 type Navigate = (selection: Partial<WorkspaceSelection>) => void;
 export function WorkspacePage() {
@@ -71,7 +73,10 @@ export function WorkspacePage() {
       onSection={onSection}
       search={search}
       searchable={
-        !!selection.snapshot && !selection.invalid && section !== 'jobs'
+        !!selection.snapshot &&
+        !selection.invalid &&
+        section !== 'jobs' &&
+        section !== 'system'
       }
       onSearch={(value) => setSearch({ snapshot: selection.snapshot, value })}
     >
@@ -104,6 +109,9 @@ function WorkspaceContent({
   section: WorkspaceSection;
   search: string;
 }) {
+  const [checkSelection, setCheckSelection] = useState<{ url: string } | null>(
+    null,
+  );
   const onSection = (section: WorkspaceSection) =>
     navigate({ ...selection, section });
   const project = useQuery({
@@ -125,6 +133,10 @@ function WorkspaceContent({
   const onJob = (job: string) =>
     navigate({ ...selection, job, section: 'jobs' });
   const onResult = (job: Job) => {
+    if (job.kind === 'system_check' && job.result_url) {
+      setCheckSelection({ url: job.result_url });
+      onSection('system');
+    }
     if (job.kind === 'import' && job.snapshot_id)
       navigate({
         project: selection.project,
@@ -422,8 +434,14 @@ function WorkspaceContent({
           requirement('快照与对比')
         )}
       </ComparisonPage>
-      <SystemPage active={section === 'jobs'}>
-        <SystemStatusSummary onOpen={() => onSection('jobs')} />
+      <SystemPage active={section === 'system'}>
+        <SystemStatusPage
+          active={section === 'system'}
+          selectedCheck={checkSelection}
+          onHistory={() => onSection('jobs')}
+        />
+      </SystemPage>
+      <TaskHistoryPage active={section === 'jobs'}>
         {selection.job && (
           <JobStatus
             key={selection.job}
@@ -433,8 +451,14 @@ function WorkspaceContent({
             onResult={onResult}
           />
         )}
-        <JobsPage embedded active={section === 'jobs'} />
-      </SystemPage>
+        <JobsPage
+          active={section === 'jobs'}
+          onCheck={(url) => {
+            setCheckSelection({ url });
+            onSection('system');
+          }}
+        />
+      </TaskHistoryPage>
     </>
   );
 }
@@ -503,7 +527,7 @@ function SnapshotPages({
     (selection.panel === null && !!(selection.run || selection.system_run));
   return (
     <>
-      <SourcePage active={section === 'source'}>
+      <SourcePage active={section === 'source'} context={search}>
         <SourceWorkspace
           files={files}
           snapshotId={snapshotId}

@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import type {
   Evidence,
   Graph,
@@ -97,6 +97,10 @@ export function GraphDiagram({
     item?.kind === 'node' ? nodes.find((node) => node.id === item.id) : null;
   const currentEdge =
     item?.kind === 'edge' ? edges.find((edge) => edge.id === item.id) : null;
+  const inspector = useRef<HTMLElement>(null);
+  useEffect(() => {
+    inspector.current?.focus({ preventScroll: true });
+  }, [item?.id, item?.kind]);
   const group = (node: GraphNode) =>
     node.kind.startsWith('frontend')
       ? 0
@@ -375,7 +379,12 @@ export function GraphDiagram({
           </div>
         </div>
         {!compact && item && (
-          <aside className="graph-inspector" aria-label="图内依据">
+          <aside
+            className="graph-inspector"
+            aria-label="图内依据"
+            ref={inspector}
+            tabIndex={-1}
+          >
             <div className="graph-inspector-title">
               <h3>{currentEdge ? '关系依据' : '节点依据'}</h3>
               <button

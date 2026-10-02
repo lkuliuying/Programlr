@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from 'antd';
 import type { Snapshot } from '../../shared/api/generated/schema';
 import { Feedback } from '../../shared/components/Feedback';
+import { ContentPager } from '../../shared/components/ContentPager';
 import { listSnapshots, renameSnapshot } from './api/projects-api';
 
 export function SnapshotNameForm({ snapshot }: { snapshot: Snapshot }) {
@@ -90,29 +91,31 @@ export function SnapshotNameForm({ snapshot }: { snapshot: Snapshot }) {
           }
         }}
       >
-        <label>
-          快照名称
-          <input
-            required
-            maxLength={400}
-            value={name}
-            disabled={mutation.isPending}
-            placeholder="为这份快照命名"
-            onChange={(event) => {
-              dirty.current = true;
-              setSaved(false);
-              setName(event.target.value);
-            }}
-          />
-        </label>
-        <small>
-          名称保存在服务端；只更新名称，源码内容和已有分析引用保持原快照。
-        </small>
-        <Button htmlType="submit" loading={mutation.isPending}>
-          保存快照名称
-        </Button>
-        <Feedback error={mutation.error} />
-        {saved && <p role="status">快照名称已保存。</p>}
+        <ContentPager label="快照命名" active={open}>
+          <label>
+            快照名称
+            <input
+              required
+              maxLength={400}
+              value={name}
+              disabled={mutation.isPending}
+              placeholder="为这份快照命名"
+              onChange={(event) => {
+                dirty.current = true;
+                setSaved(false);
+                setName(event.target.value);
+              }}
+            />
+          </label>
+          <small>
+            名称保存在服务端；只更新名称，源码内容和已有分析引用保持原快照。
+          </small>
+          <Button htmlType="submit" loading={mutation.isPending}>
+            保存快照名称
+          </Button>
+          <Feedback error={mutation.error} />
+          {saved && <p role="status">快照名称已保存。</p>}
+        </ContentPager>
       </form>
     </div>
   );

@@ -1,0 +1,1364 @@
+openapi: 3.0.3
+info:
+  title: 独立任务管理教学示例 API
+  version: 1.0.0
+  description: 从本服务 Serializer/View 自动生成，请勿手工修改；仅包含已实现操作。
+paths:
+  /api/v1/csrf/:
+    get:
+      operationId: task_board_csrf_retrieve
+      tags:
+      - api
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Csrf'
+          description: ''
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+        '406':
+          description: NOT_ACCEPTABLE：仅提供 application/json 响应。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+        '500':
+          description: INTERNAL_ERROR：未预期失败，正文不包含内部诊断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+  /api/v1/tasks/:
+    get:
+      operationId: task_board_tasks_list
+      parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+          default: 1
+        description: 只接受单个 ASCII 十进制正整数；重复参数拒绝。
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
+        description: 只接受单个 ASCII 十进制正整数；重复参数拒绝。
+      tags:
+      - api
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskPage'
+          description: ''
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+        '406':
+          description: NOT_ACCEPTABLE：仅提供 application/json 响应。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+        '500':
+          description: INTERNAL_ERROR：未预期失败，正文不包含内部诊断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+    post:
+      operationId: task_board_tasks_create
+      parameters:
+      - in: header
+        name: Idempotency-Key
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: header
+        name: Origin
+        schema:
+          type: string
+        required: true
+      - in: header
+        name: X-CSRFToken
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+          description: ''
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+          description: ''
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+        '413':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+        '415':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+        '406':
+          description: NOT_ACCEPTABLE：仅提供 application/json 响应。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+        '500':
+          description: INTERNAL_ERROR：未预期失败，正文不包含内部诊断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+  /internal/labs/runs/{run_id}/:
+    get:
+      operationId: lab_board_runs_retrieve
+      parameters:
+      - in: path
+        name: run_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - internal
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Observation'
+          description: ''
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+        '413':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+        '415':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+        '406':
+          description: NOT_ACCEPTABLE：仅提供 application/json 响应。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+        '500':
+          description: INTERNAL_ERROR：未预期失败，正文不包含内部诊断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+    post:
+      operationId: lab_board_runs_open
+      parameters:
+      - in: path
+        name: run_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - internal
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Observation'
+          description: ''
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+        '413':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+        '415':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+        '406':
+          description: NOT_ACCEPTABLE：仅提供 application/json 响应。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+        '500':
+          description: INTERNAL_ERROR：未预期失败，正文不包含内部诊断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+  /internal/labs/runs/{run_id}/cases/{case}/:
+    post:
+      operationId: lab_board_cases_create
+      parameters:
+      - in: path
+        name: case
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: run_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - internal
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                title:
+                  type: string
+                  enum:
+                  - 实验任务
+                  - ''
+                  - '   '
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+          description: ''
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+          description: ''
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+        '413':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+        '415':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+        '406':
+          description: NOT_ACCEPTABLE：仅提供 application/json 响应。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+        '500':
+          description: INTERNAL_ERROR：未预期失败，正文不包含内部诊断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+  /internal/labs/runs/{run_id}/close/:
+    post:
+      operationId: lab_board_runs_close
+      parameters:
+      - in: path
+        name: run_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - internal
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Observation'
+          description: ''
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+        '413':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+        '415':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+        '406':
+          description: NOT_ACCEPTABLE：仅提供 application/json 响应。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+        '500':
+          description: INTERNAL_ERROR：未预期失败，正文不包含内部诊断。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          headers:
+            X-Request-ID:
+              required: true
+              description: 服务端生成；错误正文的 request_id 与此值一致。
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum:
+                - no-store
+components:
+  schemas:
+    Csrf:
+      type: object
+      properties:
+        csrf_token:
+          type: string
+      required:
+      - csrf_token
+    Error:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: {}
+        request_id:
+          type: string
+      required:
+      - code
+      - details
+      - message
+      - request_id
+    Observation:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        example_version:
+          type: string
+        closed:
+          type: boolean
+        record_count:
+          type: integer
+          maximum: 4
+          minimum: 0
+        deleted_count:
+          type: integer
+          maximum: 4
+          minimum: 0
+        expires_at:
+          type: string
+          format: date-time
+      required:
+      - closed
+      - deleted_count
+      - example_version
+      - expires_at
+      - id
+      - record_count
+    Task:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        title:
+          type: string
+          maxLength: 200
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - title
+    TaskPage:
+      type: object
+      properties:
+        count:
+          type: integer
+          minimum: 0
+        next:
+          type: string
+          nullable: true
+        previous:
+          type: string
+          nullable: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Task'
+      required:
+      - count
+      - next
+      - previous
+      - results
+    TaskRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: 去掉首尾空白后长度 1–200；拒绝纯空白、null、非字符串和 NUL。
+      required:
+      - title
+      additionalProperties: false

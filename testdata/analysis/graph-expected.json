@@ -1,0 +1,29 @@
+{
+  "annotation_version": "1.0.0",
+  "annotation_method": "manual",
+  "review_note": "复核既有 task-board-create 和 drf-static 基准的静态后端投影；不是运行轨迹，也不包含 service/ORM 或前端关系。",
+  "cases": [
+    {
+      "fixture": "task-board",
+      "method": "POST",
+      "path": "/api/v1/tasks/",
+      "symbols": {"view": "TaskListCreateView", "serializer": "TaskSerializer", "model": "Task"},
+      "action_rule": "python.method",
+      "action_evidence_kind": "source_fact"
+    },
+    {
+      "fixture": "drf-static",
+      "method": "POST",
+      "path": "/api/tasks/$",
+      "symbols": {"view": "TaskViewSet", "serializer": "TaskSerializer", "model": "Task"},
+      "action_rule": "drf/3.18.1.create",
+      "action_evidence_kind": "framework_rule"
+    }
+  ],
+  "relations": [
+    ["endpoint", "view", "route_view"],
+    ["view", "serializer", "serializer_class"],
+    ["serializer", "model", "meta_model"]
+  ],
+  "excluded_relations": ["service direct_call", "orm_get_or_create", "frontend"]
+}

@@ -1,0 +1,22 @@
+[
+  {
+    "package": "@rc-component/image",
+    "version": "1.10.0",
+    "reason": "图片组使用专用 imageRender 参数，继承时先移除父接口的单图回调声明。",
+    "files": ["es/PreviewGroup.d.ts", "lib/PreviewGroup.d.ts"],
+    "before": "GroupPreviewConfig extends InternalPreviewConfig {",
+    "after": "GroupPreviewConfig extends Omit<InternalPreviewConfig, 'imageRender'> {",
+    "before_sha256": "af6bf86b483eee933366555ec38d289524058c5d879c32c13d6bc018f971bd0b",
+    "after_sha256": "376cc7545b519f27889c4da8a11edf54b097f9e8a0cf636f333fda2aff9d57f4"
+  },
+  {
+    "package": "@rc-component/picker",
+    "version": "1.12.2",
+    "reason": "单值面板已有可空 defaultValue 声明，继承时先移除父接口同名属性，保留其余约束。",
+    "files": ["es/PickerPanel/index.d.ts", "lib/PickerPanel/index.d.ts"],
+    "before": "extends BasePickerPanelProps<DateType> {",
+    "after": "extends Omit<BasePickerPanelProps<DateType>, 'defaultValue'> {",
+    "before_sha256": "d42e0e90b8efe93fd58a73878eb2d6a3dc6cfceac2e8632b065d38f4ef3c95aa",
+    "after_sha256": "b940573281cf14e55dfafa1de024f1c700677f603b15df0373abd2029fc4ce2f"
+  }
+]

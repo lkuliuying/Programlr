@@ -1,0 +1,53 @@
+{
+  "dataset_version": "v02-development/1.0.0",
+  "group": "development",
+  "origin": "编码代理根据已锁定 DRF 源码和 TypeScript 语法构造的合成样例；不冒称真实用户项目或独立人工标注",
+  "cases": [
+    {
+      "id": "list-action-defaults",
+      "kind": "router",
+      "supported": true,
+      "view_source": "from rest_framework.viewsets import GenericViewSet\nfrom rest_framework.decorators import action\nfrom serializers import ItemSerializer\nclass ItemViewSet(GenericViewSet):\n    serializer_class = ItemSerializer\n    @action(detail=False)\n    def recent_items(self, request):\n        pass\n",
+      "router_source": "from rest_framework.routers import SimpleRouter\nfrom views import ItemViewSet\nrouter = SimpleRouter()\nrouter.register('items', ItemViewSet, basename='item')\nurlpatterns = router.urls\n",
+      "expected_endpoints": [["GET", "/api/items/recent_items/$", "recent_items", "ItemSerializer"]]
+    },
+    {
+      "id": "detail-action-serializer",
+      "kind": "router",
+      "supported": true,
+      "view_source": "from rest_framework.viewsets import GenericViewSet\nfrom rest_framework.decorators import action\nfrom serializers import ItemSerializer, AlternateSerializer\nclass ItemViewSet(GenericViewSet):\n    serializer_class = ItemSerializer\n    @action(detail=True, methods=['post', 'delete'], url_path='activate', serializer_class=AlternateSerializer)\n    def activate_item(self, request, pk=None):\n        pass\n",
+      "router_source": "from rest_framework.routers import SimpleRouter\nfrom views import ItemViewSet\nrouter = SimpleRouter()\nrouter.register('items', ItemViewSet, basename='item')\nurlpatterns = router.urls\n",
+      "expected_endpoints": [["POST", "/api/items/(?P<pk>[^/.]+)/activate/$", "activate_item", "AlternateSerializer"], ["DELETE", "/api/items/(?P<pk>[^/.]+)/activate/$", "activate_item", "AlternateSerializer"]]
+    },
+    {
+      "id": "dynamic-action-detail",
+      "kind": "router",
+      "supported": false,
+      "view_source": "from rest_framework.viewsets import GenericViewSet\nfrom rest_framework.decorators import action\nfrom serializers import ItemSerializer\nflag = choose()\nclass ItemViewSet(GenericViewSet):\n    serializer_class = ItemSerializer\n    @action(detail=flag)\n    def recent(self, request):\n        pass\n",
+      "router_source": "from rest_framework.routers import SimpleRouter\nfrom views import ItemViewSet\nrouter = SimpleRouter()\nrouter.register('items', ItemViewSet, basename='item')\nurlpatterns = router.urls\n",
+      "expected_endpoints": []
+    },
+    {
+      "id": "shadowed-action",
+      "kind": "router",
+      "supported": false,
+      "view_source": "from rest_framework.viewsets import GenericViewSet\nfrom rest_framework.decorators import action\nfrom serializers import ItemSerializer\naction = choose()\nclass ItemViewSet(GenericViewSet):\n    serializer_class = ItemSerializer\n    @action(detail=False)\n    def recent(self, request):\n        pass\n",
+      "router_source": "from rest_framework.routers import SimpleRouter\nfrom views import ItemViewSet\nrouter = SimpleRouter()\nrouter.register('items', ItemViewSet, basename='item')\nurlpatterns = router.urls\n",
+      "expected_endpoints": []
+    },
+    {
+      "id": "constant-template",
+      "kind": "frontend",
+      "supported": true,
+      "frontend_sources": {"api.ts": "const root='/api/'; const resource='items/'; export function load(){return fetch(`${root}${resource}`);}\n"},
+      "expected_requests": [["GET", "/api/items/", "static", "confirmed"]]
+    },
+    {
+      "id": "runtime-template",
+      "kind": "frontend",
+      "supported": false,
+      "frontend_sources": {"api.ts": "export function load(id: string){return fetch(`/api/items/${id}/`);}\n"},
+      "expected_requests": [["GET", null, "dynamic", "unmatched"]]
+    }
+  ]
+}

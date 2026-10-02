@@ -1,0 +1,564 @@
+{
+  "annotation_version": "1.0.1",
+  "example_version": "task-board/1.0.0",
+  "source_root": "examples/task-board",
+  "annotation_method": "manual",
+  "review_note": "编码代理逐项核对的人工维护预期；不是解析器产物、运行轨迹或用户独立复核记录。",
+  "snapshot_binding": "本基准未导入，无 snapshot_id；后续导入须绑定实际不可变快照，禁止套用最新源码。",
+  "endpoint": {
+    "method": "POST",
+    "path": "/api/v1/tasks/"
+  },
+  "coverage": [
+    "FR-02",
+    "FR-03",
+    "FR-06",
+    "FR-07",
+    "AT-04 基准子集：path/include/as_view",
+    "AT-07 基准子集：静态 fetch 和本地调用",
+    "AT-16 示例行为基准"
+  ],
+  "not_covered": [
+    "Router 隐式动作及 axios 留待 M2/M3 样例扩展",
+    "解析器准确率",
+    "M4 固定题与答案",
+    "M5 实验编排及按运行隔离"
+  ],
+  "framework_rules": {
+    "drf_serializer": {
+      "package": "djangorestframework",
+      "version": "3.18.1",
+      "symbols": [
+        "GenericAPIView.get_serializer",
+        "Serializer.is_valid",
+        "CharField.run_validation"
+      ],
+      "basis": "项目已安装框架源码；默认行为只标规则，不伪造示例源码位置。"
+    },
+    "django_orm": {
+      "package": "django",
+      "version": "5.2.17",
+      "symbols": [
+        "QuerySet.get_or_create"
+      ],
+      "basis": "项目已安装框架源码；查询和创建由 ORM 执行，不将 SQL 行号写成示例源码。"
+    },
+    "tanstack_mutation": {
+      "package": "@tanstack/react-query",
+      "version": "5.104.0",
+      "symbols": [
+        "useMutation",
+        "mutationFn",
+        "onSuccess"
+      ],
+      "basis": "示例显式回调配置与组件行为测试；回调分派属于框架推导。"
+    },
+    "tanstack_query": {
+      "package": "@tanstack/react-query",
+      "version": "5.104.0",
+      "symbols": [
+        "useQuery",
+        "invalidateQueries"
+      ],
+      "basis": "同查询键失效与实际列表更新由组件测试核对。"
+    }
+  },
+  "nodes": [
+    {
+      "id": "form",
+      "kind": "react_form",
+      "evidence_type": "source_fact",
+      "source_ref": {
+        "file_path": "frontend/src/features/tasks/TaskBoard.tsx",
+        "start_line": 131,
+        "end_line": 134,
+        "sha256": "89339899d7b90916d3bfe6dc4054fc19fb9c776c9c1959265bc0c6a8280019aa",
+        "start_anchor": "<Form",
+        "end_anchor": "onFinish={handleSubmit}"
+      }
+    },
+    {
+      "id": "handler",
+      "kind": "local_function",
+      "evidence_type": "source_fact",
+      "source_ref": {
+        "file_path": "frontend/src/features/tasks/TaskBoard.tsx",
+        "start_line": 93,
+        "end_line": 109,
+        "sha256": "89339899d7b90916d3bfe6dc4054fc19fb9c776c9c1959265bc0c6a8280019aa",
+        "start_anchor": "function handleSubmit(values: { title: string }) {",
+        "end_anchor": "creation.mutate(operation);"
+      }
+    },
+    {
+      "id": "mutation",
+      "kind": "query_mutation",
+      "evidence_type": "source_fact",
+      "source_ref": {
+        "file_path": "frontend/src/features/tasks/TaskBoard.tsx",
+        "start_line": 34,
+        "end_line": 43,
+        "sha256": "89339899d7b90916d3bfe6dc4054fc19fb9c776c9c1959265bc0c6a8280019aa",
+        "start_anchor": "mutationFn: ({",
+        "end_anchor": "return createTask(title, key, activeRequest.current.signal);"
+      }
+    },
+    {
+      "id": "request",
+      "kind": "http_request",
+      "evidence_type": "source_fact",
+      "source_ref": {
+        "file_path": "frontend/src/features/tasks/api/tasks-api.ts",
+        "start_line": 68,
+        "end_line": 87,
+        "sha256": "3122f97bc27db3fd2634b2ebffef410b1576d74738cd2f5dba84fcb16a6389a6",
+        "start_anchor": "export async function createTask(",
+        "end_anchor": "body: JSON.stringify({ title }),"
+      }
+    },
+    {
+      "id": "root_route",
+      "kind": "django_include",
+      "evidence_type": "source_fact",
+      "source_ref": {
+        "file_path": "backend/config/urls.py",
+        "start_line": 9,
+        "end_line": 9,
+        "sha256": "9181c7a2bc7fa8276146ded00602e09137934924e1e4ff9f66140d14a3d1271e",
+        "start_anchor": "path(\"api/v1/\", include(\"apps.tasks.api.urls\")),",
+        "end_anchor": "path(\"api/v1/\", include(\"apps.tasks.api.urls\")),"
+      }
+    },
+    {
+      "id": "route",
+      "kind": "django_path",
+      "evidence_type": "source_fact",
+      "source_ref": {
+        "file_path": "backend/apps/tasks/api/urls.py",
+        "start_line": 5,
+        "end_line": 5,
+        "sha256": "61c086661cd629be80a016d8d3ab0a2878df57edbf5cccc7283a515e255b742d",
+        "start_anchor": "urlpatterns = [path(\"tasks/\", TaskListCreateView.as_view(), name=\"tasks\")]",
+        "end_anchor": "urlpatterns = [path(\"tasks/\", TaskListCreateView.as_view(), name=\"tasks\")]"
+      }
+    },
+    {
+      "id": "view",
+      "kind": "drf_view",
+      "evidence_type": "source_fact",
+      "source_ref": {
+        "file_path": "backend/apps/tasks/api/views.py",
+        "start_line": 36,
+        "end_line": 70,
+        "sha256": "2b4f9932eeb8df169a8b865fa7947779dd8649834ac3f96209d3d6b9b5c35da5",
+        "start_anchor": "class TaskListCreateView(GenericAPIView[Task]):",
+        "end_anchor": "return Response(self.get_serializer(task).data, status=201 if created else 200)"
+      }
+    },
+    {
+      "id": "serializer",
+      "kind": "drf_serializer",
+      "evidence_type": "source_fact",
+      "source_ref": {
+        "file_path": "backend/apps/tasks/api/serializers.py",
+        "start_line": 8,
+        "end_line": 30,
+        "sha256": "9ce18330b269face54331fafee2de4c145a178f2f8080ca8fbfa31d0b24700d6",
+        "start_anchor": "class TaskSerializer(serializers.ModelSerializer[Task]):",
+        "end_anchor": "return values"
+      }
+    },
+    {
+      "id": "service",
+      "kind": "service",
+      "evidence_type": "source_fact",
+      "source_ref": {
+        "file_path": "backend/apps/tasks/services.py",
+        "start_line": 7,
+        "end_line": 14,
+        "sha256": "65d960fe13a381c6a8614a0f543fd0d4026f94bb6e95f597f8fe8b682a29728f",
+        "start_anchor": "def create_task(title: str, key: uuid.UUID) -> tuple[Task, bool]:",
+        "end_anchor": "return task, created"
+      }
+    },
+    {
+      "id": "model",
+      "kind": "django_model",
+      "evidence_type": "source_fact",
+      "source_ref": {
+        "file_path": "backend/apps/tasks/models.py",
+        "start_line": 6,
+        "end_line": 17,
+        "sha256": "3c1098a15fda3453ccc0d9afba0acaacff4158cbb37514303142f71f08fac3ce",
+        "start_anchor": "class Task(models.Model):",
+        "end_anchor": "name=\"task_title_has_content\","
+      }
+    },
+    {
+      "id": "refresh",
+      "kind": "success_callback",
+      "evidence_type": "source_fact",
+      "source_ref": {
+        "file_path": "frontend/src/features/tasks/TaskBoard.tsx",
+        "start_line": 46,
+        "end_line": 59,
+        "sha256": "89339899d7b90916d3bfe6dc4054fc19fb9c776c9c1959265bc0c6a8280019aa",
+        "start_anchor": "onSuccess: async () => {",
+        "end_anchor": "await client.invalidateQueries({ queryKey: ['task-board', 'tasks'] });"
+      }
+    },
+    {
+      "id": "list",
+      "kind": "query",
+      "evidence_type": "source_fact",
+      "source_ref": {
+        "file_path": "frontend/src/features/tasks/TaskBoard.tsx",
+        "start_line": 28,
+        "end_line": 31,
+        "sha256": "89339899d7b90916d3bfe6dc4054fc19fb9c776c9c1959265bc0c6a8280019aa",
+        "start_anchor": "const tasks = useQuery({",
+        "end_anchor": "retry: false,"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "form",
+      "to": "handler",
+      "relation": "on_finish",
+      "evidence_type": "source_fact",
+      "basis": "Form.onFinish 显式引用 handleSubmit；表单校验通过后才由 Ant Design 调用。",
+      "source_refs": [
+        {
+          "file_path": "frontend/src/features/tasks/TaskBoard.tsx",
+          "start_line": 131,
+          "end_line": 134,
+          "sha256": "89339899d7b90916d3bfe6dc4054fc19fb9c776c9c1959265bc0c6a8280019aa",
+          "start_anchor": "<Form",
+          "end_anchor": "onFinish={handleSubmit}"
+        },
+        {
+          "file_path": "frontend/src/features/tasks/TaskBoard.tsx",
+          "start_line": 93,
+          "end_line": 109,
+          "sha256": "89339899d7b90916d3bfe6dc4054fc19fb9c776c9c1959265bc0c6a8280019aa",
+          "start_anchor": "function handleSubmit(values: { title: string }) {",
+          "end_anchor": "creation.mutate(operation);"
+        }
+      ]
+    },
+    {
+      "from": "handler",
+      "to": "mutation",
+      "relation": "mutation_dispatch",
+      "evidence_type": "framework_inference",
+      "basis": "creation.mutate 把标题和操作键交给 useMutation 的 mutationFn。",
+      "source_refs": [
+        {
+          "file_path": "frontend/src/features/tasks/TaskBoard.tsx",
+          "start_line": 93,
+          "end_line": 109,
+          "sha256": "89339899d7b90916d3bfe6dc4054fc19fb9c776c9c1959265bc0c6a8280019aa",
+          "start_anchor": "function handleSubmit(values: { title: string }) {",
+          "end_anchor": "creation.mutate(operation);"
+        },
+        {
+          "file_path": "frontend/src/features/tasks/TaskBoard.tsx",
+          "start_line": 34,
+          "end_line": 43,
+          "sha256": "89339899d7b90916d3bfe6dc4054fc19fb9c776c9c1959265bc0c6a8280019aa",
+          "start_anchor": "mutationFn: ({",
+          "end_anchor": "return createTask(title, key, activeRequest.current.signal);"
+        }
+      ],
+      "framework_rule": "tanstack_mutation"
+    },
+    {
+      "from": "mutation",
+      "to": "request",
+      "relation": "direct_call",
+      "evidence_type": "source_fact",
+      "basis": "mutationFn 显式调用本地导入 createTask。",
+      "source_refs": [
+        {
+          "file_path": "frontend/src/features/tasks/TaskBoard.tsx",
+          "start_line": 34,
+          "end_line": 43,
+          "sha256": "89339899d7b90916d3bfe6dc4054fc19fb9c776c9c1959265bc0c6a8280019aa",
+          "start_anchor": "mutationFn: ({",
+          "end_anchor": "return createTask(title, key, activeRequest.current.signal);"
+        },
+        {
+          "file_path": "frontend/src/features/tasks/api/tasks-api.ts",
+          "start_line": 68,
+          "end_line": 87,
+          "sha256": "3122f97bc27db3fd2634b2ebffef410b1576d74738cd2f5dba84fcb16a6389a6",
+          "start_anchor": "export async function createTask(",
+          "end_anchor": "body: JSON.stringify({ title }),"
+        }
+      ]
+    },
+    {
+      "from": "request",
+      "to": "route",
+      "relation": "method_path_match",
+      "evidence_type": "static_inference",
+      "basis": "fetch 的 POST /api/v1/tasks/ 与总路由 api/v1/ 加模块 tasks/ 唯一对应；代理不改路径。",
+      "source_refs": [
+        {
+          "file_path": "frontend/src/features/tasks/api/tasks-api.ts",
+          "start_line": 68,
+          "end_line": 87,
+          "sha256": "3122f97bc27db3fd2634b2ebffef410b1576d74738cd2f5dba84fcb16a6389a6",
+          "start_anchor": "export async function createTask(",
+          "end_anchor": "body: JSON.stringify({ title }),"
+        },
+        {
+          "file_path": "backend/apps/tasks/api/urls.py",
+          "start_line": 5,
+          "end_line": 5,
+          "sha256": "61c086661cd629be80a016d8d3ab0a2878df57edbf5cccc7283a515e255b742d",
+          "start_anchor": "urlpatterns = [path(\"tasks/\", TaskListCreateView.as_view(), name=\"tasks\")]",
+          "end_anchor": "urlpatterns = [path(\"tasks/\", TaskListCreateView.as_view(), name=\"tasks\")]"
+        }
+      ]
+    },
+    {
+      "from": "root_route",
+      "to": "route",
+      "relation": "include",
+      "evidence_type": "source_fact",
+      "basis": "字面量 include 指向 apps.tasks.api.urls。",
+      "source_refs": [
+        {
+          "file_path": "backend/config/urls.py",
+          "start_line": 9,
+          "end_line": 9,
+          "sha256": "9181c7a2bc7fa8276146ded00602e09137934924e1e4ff9f66140d14a3d1271e",
+          "start_anchor": "path(\"api/v1/\", include(\"apps.tasks.api.urls\")),",
+          "end_anchor": "path(\"api/v1/\", include(\"apps.tasks.api.urls\")),"
+        },
+        {
+          "file_path": "backend/apps/tasks/api/urls.py",
+          "start_line": 5,
+          "end_line": 5,
+          "sha256": "61c086661cd629be80a016d8d3ab0a2878df57edbf5cccc7283a515e255b742d",
+          "start_anchor": "urlpatterns = [path(\"tasks/\", TaskListCreateView.as_view(), name=\"tasks\")]",
+          "end_anchor": "urlpatterns = [path(\"tasks/\", TaskListCreateView.as_view(), name=\"tasks\")]"
+        }
+      ]
+    },
+    {
+      "from": "route",
+      "to": "view",
+      "relation": "as_view",
+      "evidence_type": "source_fact",
+      "basis": "path 绑定 TaskListCreateView.as_view()；POST 分派由 DRF 提供。",
+      "source_refs": [
+        {
+          "file_path": "backend/apps/tasks/api/urls.py",
+          "start_line": 5,
+          "end_line": 5,
+          "sha256": "61c086661cd629be80a016d8d3ab0a2878df57edbf5cccc7283a515e255b742d",
+          "start_anchor": "urlpatterns = [path(\"tasks/\", TaskListCreateView.as_view(), name=\"tasks\")]",
+          "end_anchor": "urlpatterns = [path(\"tasks/\", TaskListCreateView.as_view(), name=\"tasks\")]"
+        },
+        {
+          "file_path": "backend/apps/tasks/api/views.py",
+          "start_line": 36,
+          "end_line": 70,
+          "sha256": "2b4f9932eeb8df169a8b865fa7947779dd8649834ac3f96209d3d6b9b5c35da5",
+          "start_anchor": "class TaskListCreateView(GenericAPIView[Task]):",
+          "end_anchor": "return Response(self.get_serializer(task).data, status=201 if created else 200)"
+        }
+      ]
+    },
+    {
+      "from": "view",
+      "to": "serializer",
+      "relation": "validation",
+      "evidence_type": "framework_inference",
+      "basis": "固定 serializer_class；GenericAPIView.get_serializer 构造它，显式 is_valid 触发校验。",
+      "source_refs": [
+        {
+          "file_path": "backend/apps/tasks/api/views.py",
+          "start_line": 36,
+          "end_line": 70,
+          "sha256": "2b4f9932eeb8df169a8b865fa7947779dd8649834ac3f96209d3d6b9b5c35da5",
+          "start_anchor": "class TaskListCreateView(GenericAPIView[Task]):",
+          "end_anchor": "return Response(self.get_serializer(task).data, status=201 if created else 200)"
+        },
+        {
+          "file_path": "backend/apps/tasks/api/serializers.py",
+          "start_line": 8,
+          "end_line": 30,
+          "sha256": "9ce18330b269face54331fafee2de4c145a178f2f8080ca8fbfa31d0b24700d6",
+          "start_anchor": "class TaskSerializer(serializers.ModelSerializer[Task]):",
+          "end_anchor": "return values"
+        }
+      ],
+      "framework_rule": "drf_serializer"
+    },
+    {
+      "from": "serializer",
+      "to": "model",
+      "relation": "meta_model",
+      "evidence_type": "source_fact",
+      "basis": "TaskSerializer.Meta.model 直接引用 Task；title 显式必填且拒绝空白。",
+      "source_refs": [
+        {
+          "file_path": "backend/apps/tasks/api/serializers.py",
+          "start_line": 8,
+          "end_line": 30,
+          "sha256": "9ce18330b269face54331fafee2de4c145a178f2f8080ca8fbfa31d0b24700d6",
+          "start_anchor": "class TaskSerializer(serializers.ModelSerializer[Task]):",
+          "end_anchor": "return values"
+        },
+        {
+          "file_path": "backend/apps/tasks/models.py",
+          "start_line": 6,
+          "end_line": 17,
+          "sha256": "3c1098a15fda3453ccc0d9afba0acaacff4158cbb37514303142f71f08fac3ce",
+          "start_anchor": "class Task(models.Model):",
+          "end_anchor": "name=\"task_title_has_content\","
+        }
+      ]
+    },
+    {
+      "from": "view",
+      "to": "service",
+      "relation": "direct_call",
+      "evidence_type": "source_fact",
+      "basis": "只在 is_valid 成功后，把 validated_data.title 和 UUID 键交给 create_task。",
+      "source_refs": [
+        {
+          "file_path": "backend/apps/tasks/api/views.py",
+          "start_line": 36,
+          "end_line": 70,
+          "sha256": "2b4f9932eeb8df169a8b865fa7947779dd8649834ac3f96209d3d6b9b5c35da5",
+          "start_anchor": "class TaskListCreateView(GenericAPIView[Task]):",
+          "end_anchor": "return Response(self.get_serializer(task).data, status=201 if created else 200)"
+        },
+        {
+          "file_path": "backend/apps/tasks/services.py",
+          "start_line": 7,
+          "end_line": 14,
+          "sha256": "65d960fe13a381c6a8614a0f543fd0d4026f94bb6e95f597f8fe8b682a29728f",
+          "start_anchor": "def create_task(title: str, key: uuid.UUID) -> tuple[Task, bool]:",
+          "end_anchor": "return task, created"
+        }
+      ]
+    },
+    {
+      "from": "service",
+      "to": "model",
+      "relation": "orm_get_or_create",
+      "evidence_type": "framework_inference",
+      "basis": "Task.objects.get_or_create 由 Django ORM 执行查询/事务创建，唯一键约束保护并发。",
+      "source_refs": [
+        {
+          "file_path": "backend/apps/tasks/services.py",
+          "start_line": 7,
+          "end_line": 14,
+          "sha256": "65d960fe13a381c6a8614a0f543fd0d4026f94bb6e95f597f8fe8b682a29728f",
+          "start_anchor": "def create_task(title: str, key: uuid.UUID) -> tuple[Task, bool]:",
+          "end_anchor": "return task, created"
+        },
+        {
+          "file_path": "backend/apps/tasks/models.py",
+          "start_line": 6,
+          "end_line": 17,
+          "sha256": "3c1098a15fda3453ccc0d9afba0acaacff4158cbb37514303142f71f08fac3ce",
+          "start_anchor": "class Task(models.Model):",
+          "end_anchor": "name=\"task_title_has_content\","
+        }
+      ],
+      "framework_rule": "django_orm"
+    },
+    {
+      "from": "request",
+      "to": "refresh",
+      "relation": "mutation_success",
+      "evidence_type": "framework_inference",
+      "basis": "响应解析成功后，TanStack Query 调用 onSuccess；不是源代码中 createTask 的直接调用。",
+      "source_refs": [
+        {
+          "file_path": "frontend/src/features/tasks/api/tasks-api.ts",
+          "start_line": 68,
+          "end_line": 87,
+          "sha256": "3122f97bc27db3fd2634b2ebffef410b1576d74738cd2f5dba84fcb16a6389a6",
+          "start_anchor": "export async function createTask(",
+          "end_anchor": "body: JSON.stringify({ title }),"
+        },
+        {
+          "file_path": "frontend/src/features/tasks/TaskBoard.tsx",
+          "start_line": 46,
+          "end_line": 59,
+          "sha256": "89339899d7b90916d3bfe6dc4054fc19fb9c776c9c1959265bc0c6a8280019aa",
+          "start_anchor": "onSuccess: async () => {",
+          "end_anchor": "await client.invalidateQueries({ queryKey: ['task-board', 'tasks'] });"
+        }
+      ],
+      "framework_rule": "tanstack_mutation"
+    },
+    {
+      "from": "refresh",
+      "to": "list",
+      "relation": "invalidate_query",
+      "evidence_type": "framework_inference",
+      "basis": "成功后失效相同前缀查询并回到第一页；列表通过重新 GET 更新。",
+      "source_refs": [
+        {
+          "file_path": "frontend/src/features/tasks/TaskBoard.tsx",
+          "start_line": 46,
+          "end_line": 59,
+          "sha256": "89339899d7b90916d3bfe6dc4054fc19fb9c776c9c1959265bc0c6a8280019aa",
+          "start_anchor": "onSuccess: async () => {",
+          "end_anchor": "await client.invalidateQueries({ queryKey: ['task-board', 'tasks'] });"
+        },
+        {
+          "file_path": "frontend/src/features/tasks/TaskBoard.tsx",
+          "start_line": 28,
+          "end_line": 31,
+          "sha256": "89339899d7b90916d3bfe6dc4054fc19fb9c776c9c1959265bc0c6a8280019aa",
+          "start_anchor": "const tasks = useQuery({",
+          "end_anchor": "retry: false,"
+        }
+      ],
+      "framework_rule": "tanstack_query"
+    }
+  ],
+  "validation_cases": [
+    {
+      "id": "normal",
+      "input": {
+        "title": "学习请求校验"
+      },
+      "expected_status": 201,
+      "expected_writes": 1
+    },
+    {
+      "id": "missing",
+      "input": {},
+      "expected_status": 400,
+      "expected_writes": 0
+    },
+    {
+      "id": "empty",
+      "input": {
+        "title": ""
+      },
+      "expected_status": 400,
+      "expected_writes": 0
+    },
+    {
+      "id": "whitespace",
+      "input": {
+        "title": " \t\n "
+      },
+      "expected_status": 400,
+      "expected_writes": 0
+    }
+  ],
+  "observation_boundary": "以上是预期，不是实测响应；本次真实结果由阶段计划指向 .runtime 报告。"
+}

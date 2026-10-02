@@ -1,0 +1,82 @@
+{
+  "dataset_version": "v02-evaluation/1.0.0",
+  "group": "evaluation",
+  "origin": "独立于开发输入的合成评估样例，预期来自锁定框架源码核对；编码代理维护，尚非真实用户项目或独立人工审阅",
+  "cases": [
+    {
+      "id": "aliased-action-and-router",
+      "kind": "router",
+      "supported": true,
+      "view_source": "from rest_framework import viewsets, decorators as d\nfrom serializers import ItemSerializer\nclass ItemViewSet(viewsets.GenericViewSet):\n    serializer_class = ItemSerializer\n    @d.action(detail=False, methods=['GET', 'patch'], url_path='by-status/active')\n    def active(self, request):\n        pass\n",
+      "router_source": "from rest_framework.routers import SimpleRouter as Router\nfrom views import ItemViewSet\nrouter = Router(trailing_slash=False)\nrouter.register('items', ItemViewSet, basename='item')\nurlpatterns = router.urls\n",
+      "expected_endpoints": [["GET", "/api/items/by-status/active$", "active", "ItemSerializer"], ["PATCH", "/api/items/by-status/active$", "active", "ItemSerializer"]]
+    },
+    {
+      "id": "inherited-action-path-router",
+      "kind": "router",
+      "supported": true,
+      "view_source": "from rest_framework.viewsets import GenericViewSet\nfrom rest_framework.decorators import action as route\nfrom serializers import ItemSerializer, AlternateSerializer\nclass Base(GenericViewSet):\n    serializer_class = ItemSerializer\n    @route(detail=True, url_path='summary', serializer_class=AlternateSerializer)\n    def summarize(self, request, pk=None):\n        pass\nclass ItemViewSet(Base):\n    pass\n",
+      "router_source": "from rest_framework.routers import SimpleRouter\nfrom views import ItemViewSet\nrouter = SimpleRouter(use_regex_path=False)\nrouter.register('items', ItemViewSet, basename='item')\nurlpatterns = router.urls\n",
+      "expected_endpoints": [["GET", "/api/items/<str:pk>/summary/", "summarize", "AlternateSerializer"]]
+    },
+    {
+      "id": "custom-router",
+      "kind": "router",
+      "supported": false,
+      "view_source": "from rest_framework.viewsets import GenericViewSet\nfrom rest_framework.decorators import action\nclass ItemViewSet(GenericViewSet):\n    @action(detail=False)\n    def status(self, request):\n        pass\n",
+      "router_source": "from rest_framework.routers import SimpleRouter\nfrom views import ItemViewSet\nclass CustomRouter(SimpleRouter):\n    pass\nrouter = CustomRouter()\nrouter.register('items', ItemViewSet, basename='item')\nurlpatterns = router.urls\n",
+      "expected_endpoints": []
+    },
+    {
+      "id": "dynamic-methods",
+      "kind": "router",
+      "supported": false,
+      "view_source": "from rest_framework.viewsets import GenericViewSet\nfrom rest_framework.decorators import action\nmethods = ['post']\nclass ItemViewSet(GenericViewSet):\n    @action(detail=False, methods=methods)\n    def status(self, request):\n        pass\n",
+      "router_source": "from rest_framework.routers import SimpleRouter\nfrom views import ItemViewSet\nrouter = SimpleRouter()\nrouter.register('items', ItemViewSet, basename='item')\nurlpatterns = router.urls\n",
+      "expected_endpoints": []
+    },
+    {
+      "id": "imported-nested-template",
+      "kind": "frontend",
+      "supported": true,
+      "frontend_sources": {"constants.ts": "export const root='/api/'; export const noun='items';\n", "api.ts": "import {root as prefix,noun} from './constants'; const url=`${prefix}${`${noun}/`}`; fetch(url);\n"},
+      "expected_requests": [["GET", "/api/items/", "static", "confirmed"]]
+    },
+    {
+      "id": "literal-template-control",
+      "kind": "frontend",
+      "supported": true,
+      "frontend_sources": {"api.ts": "fetch(`/api/items/`);\n"},
+      "expected_requests": [["GET", "/api/items/", "static", "confirmed"]]
+    },
+    {
+      "id": "mutable-template",
+      "kind": "frontend",
+      "supported": false,
+      "frontend_sources": {"api.ts": "let prefix='/api/'; prefix=choose(); fetch(`${prefix}items/`);\n"},
+      "expected_requests": [["GET", null, "dynamic", "unmatched"]]
+    },
+    {
+      "id": "shadowed-template-parameter",
+      "kind": "frontend",
+      "supported": false,
+      "frontend_sources": {"api.ts": "const prefix='/api/'; export function load(prefix: string){return fetch(`${prefix}items/`);}\n"},
+      "expected_requests": [["GET", null, "dynamic", "unmatched"]]
+    },
+    {
+      "id": "environment-template",
+      "kind": "frontend",
+      "supported": false,
+      "frontend_sources": {"api.ts": "const base=process.env.API; fetch(`${base}/api/items/`);\n"},
+      "expected_requests": [["GET", null, "dynamic", "unmatched"]]
+    },
+    {
+      "id": "duplicate-endpoints-candidate",
+      "kind": "frontend",
+      "supported": true,
+      "duplicate_routes": true,
+      "frontend_sources": {"api.ts": "const root='/api'; fetch(`${root}/items/`);\n"},
+      "expected_requests": [["GET", "/api/items/", "static", "candidate"]]
+    }
+  ]
+}

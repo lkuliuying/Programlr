@@ -1,0 +1,11 @@
+{
+  "version": "analysis-support/0.2.0",
+  "framework_basis": ["rest_framework/decorators.py:action", "rest_framework/routers.py:SimpleRouter.get_routes", "DRF 3.18.1", "TypeScript 6.0.3 Compiler API"],
+  "annotation_scope": "合成样例的维护者预期与独立开发/评估分组；不宣称真实用户准确率或独立人工审阅完成",
+  "supported": ["标准 SimpleRouter/DefaultRouter 的字面量 action 参数和继承动作", "detail 必填布尔值，methods 默认 get，url_path 默认方法名", "直接 serializer_class 引用且没有动态选择", "不可变字符串常量、唯一相对导入、嵌套模板插值"],
+  "unsupported": ["动态装饰参数、自定义 Router、动态分派", "action.mapping 的二次方法装饰、额外未知装饰器", "运行时模板值、环境配置、参数化请求封装", "跨函数参数传播、通用调用图、其他框架"],
+  "budgets": {"template_depth": 32, "template_length": 8192, "ast_nodes": 500000, "parser_output_bytes": 8388608},
+  "development": "v02-development.json",
+  "evaluation": "v02-evaluation.json",
+  "old_rule_baseline": "v02-old-rule-baseline.json"
+}

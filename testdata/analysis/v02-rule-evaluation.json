@@ -1,0 +1,273 @@
+{
+  "backend_rule_version": "python-drf/1.1.0",
+  "frontend_rule_version": "typescript-react/1.1.0",
+  "scope": "合成有限集；识别分母与不支持项分开，无容量或真实项目准确率承诺",
+  "groups": {
+    "development": {
+      "dataset_version": "v02-development/1.0.0",
+      "dataset_sha256": "0a69a4a4c5b97de5c84a9ae453bc6ffebd2e50631b01ffdaaafb29c1b6b608b1",
+      "case_count": 6,
+      "totals": {
+        "expected_supported_items": 4,
+        "correct_recognitions": 4,
+        "false_associations": 0,
+        "missed_items": 0,
+        "candidates": 0,
+        "unsupported_cases": 3,
+        "fully_matching_cases": 6
+      },
+      "cases": [
+        {
+          "case": "list-action-defaults",
+          "supported": true,
+          "matches_expectation": true,
+          "endpoints": [
+            [
+              "GET",
+              "/api/items/recent_items/$",
+              "recent_items",
+              "ItemSerializer"
+            ]
+          ],
+          "requests": [],
+          "diagnostics": []
+        },
+        {
+          "case": "detail-action-serializer",
+          "supported": true,
+          "matches_expectation": true,
+          "endpoints": [
+            [
+              "DELETE",
+              "/api/items/(?P<pk>[^/.]+)/activate/$",
+              "activate_item",
+              "AlternateSerializer"
+            ],
+            [
+              "POST",
+              "/api/items/(?P<pk>[^/.]+)/activate/$",
+              "activate_item",
+              "AlternateSerializer"
+            ]
+          ],
+          "requests": [],
+          "diagnostics": []
+        },
+        {
+          "case": "dynamic-action-detail",
+          "supported": false,
+          "matches_expectation": true,
+          "endpoints": [],
+          "requests": [],
+          "diagnostics": [
+            "CUSTOM_ACTION_UNRESOLVED"
+          ]
+        },
+        {
+          "case": "shadowed-action",
+          "supported": false,
+          "matches_expectation": true,
+          "endpoints": [],
+          "requests": [],
+          "diagnostics": [
+            "CUSTOM_ACTION_UNRESOLVED"
+          ]
+        },
+        {
+          "case": "constant-template",
+          "supported": true,
+          "matches_expectation": true,
+          "endpoints": null,
+          "requests": [
+            [
+              "GET",
+              "/api/items/",
+              "static",
+              "confirmed"
+            ]
+          ],
+          "diagnostics": []
+        },
+        {
+          "case": "runtime-template",
+          "supported": false,
+          "matches_expectation": true,
+          "endpoints": null,
+          "requests": [
+            [
+              "GET",
+              null,
+              "dynamic",
+              "unmatched"
+            ]
+          ],
+          "diagnostics": []
+        }
+      ]
+    },
+    "evaluation": {
+      "dataset_version": "v02-evaluation/1.0.0",
+      "dataset_sha256": "656caafd6a7081ce7d0dd346a43bc8733e8652f18be7384c34f815add19d656f",
+      "case_count": 10,
+      "totals": {
+        "expected_supported_items": 6,
+        "correct_recognitions": 6,
+        "false_associations": 0,
+        "missed_items": 0,
+        "candidates": 1,
+        "unsupported_cases": 5,
+        "fully_matching_cases": 10
+      },
+      "cases": [
+        {
+          "case": "aliased-action-and-router",
+          "supported": true,
+          "matches_expectation": true,
+          "endpoints": [
+            [
+              "GET",
+              "/api/items/by-status/active$",
+              "active",
+              "ItemSerializer"
+            ],
+            [
+              "PATCH",
+              "/api/items/by-status/active$",
+              "active",
+              "ItemSerializer"
+            ]
+          ],
+          "requests": [],
+          "diagnostics": []
+        },
+        {
+          "case": "inherited-action-path-router",
+          "supported": true,
+          "matches_expectation": true,
+          "endpoints": [
+            [
+              "GET",
+              "/api/items/<str:pk>/summary/",
+              "summarize",
+              "AlternateSerializer"
+            ]
+          ],
+          "requests": [],
+          "diagnostics": []
+        },
+        {
+          "case": "custom-router",
+          "supported": false,
+          "matches_expectation": true,
+          "endpoints": [],
+          "requests": [],
+          "diagnostics": [
+            "ROUTER_UNRESOLVED"
+          ]
+        },
+        {
+          "case": "dynamic-methods",
+          "supported": false,
+          "matches_expectation": true,
+          "endpoints": [],
+          "requests": [],
+          "diagnostics": [
+            "CUSTOM_ACTION_UNRESOLVED"
+          ]
+        },
+        {
+          "case": "imported-nested-template",
+          "supported": true,
+          "matches_expectation": true,
+          "endpoints": null,
+          "requests": [
+            [
+              "GET",
+              "/api/items/",
+              "static",
+              "confirmed"
+            ]
+          ],
+          "diagnostics": []
+        },
+        {
+          "case": "literal-template-control",
+          "supported": true,
+          "matches_expectation": true,
+          "endpoints": null,
+          "requests": [
+            [
+              "GET",
+              "/api/items/",
+              "static",
+              "confirmed"
+            ]
+          ],
+          "diagnostics": []
+        },
+        {
+          "case": "mutable-template",
+          "supported": false,
+          "matches_expectation": true,
+          "endpoints": null,
+          "requests": [
+            [
+              "GET",
+              null,
+              "dynamic",
+              "unmatched"
+            ]
+          ],
+          "diagnostics": []
+        },
+        {
+          "case": "shadowed-template-parameter",
+          "supported": false,
+          "matches_expectation": true,
+          "endpoints": null,
+          "requests": [
+            [
+              "GET",
+              null,
+              "dynamic",
+              "unmatched"
+            ]
+          ],
+          "diagnostics": []
+        },
+        {
+          "case": "environment-template",
+          "supported": false,
+          "matches_expectation": true,
+          "endpoints": null,
+          "requests": [
+            [
+              "GET",
+              null,
+              "dynamic",
+              "unmatched"
+            ]
+          ],
+          "diagnostics": []
+        },
+        {
+          "case": "duplicate-endpoints-candidate",
+          "supported": true,
+          "matches_expectation": true,
+          "endpoints": null,
+          "requests": [
+            [
+              "GET",
+              "/api/items/",
+              "static",
+              "candidate"
+            ]
+          ],
+          "diagnostics": [
+            "DUPLICATE_ENDPOINT"
+          ]
+        }
+      ]
+    }
+  }
+}

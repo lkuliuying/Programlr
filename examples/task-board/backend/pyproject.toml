@@ -1,0 +1,53 @@
+[project]
+name = "task-board-backend"
+version = "1.0.0"
+description = "独立任务管理教学示例"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "django==5.2.17",
+    "djangorestframework==3.18.1",
+    "psycopg[binary]==3.3.6",
+    "gunicorn==26.2.0",
+    "drf-spectacular==0.30.0",
+]
+
+[dependency-groups]
+dev = [
+    "ruff==0.16.9",
+    "pytest==9.1.1",
+    "pytest-django==4.14.0",
+    "mypy==2.3.0",
+    "django-stubs[compatible-mypy]==6.1.0",
+    "djangorestframework-stubs[compatible-mypy]==3.18.1",
+]
+
+[tool.uv]
+package = false
+required-version = "==0.12.19"
+
+[[tool.uv.index]]
+name = "pypi"
+url = "https://pypi.org/simple"
+default = true
+
+[tool.ruff]
+target-version = "py313"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "UP"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings.local"
+pythonpath = ["."]
+testpaths = ["apps/tasks/tests"]
+addopts = "--strict-markers --strict-config"
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+plugins = ["mypy_django_plugin.main", "mypy_drf_plugin.main"]
+
+[tool.django-stubs]
+django_settings_module = "config.settings.test"
+

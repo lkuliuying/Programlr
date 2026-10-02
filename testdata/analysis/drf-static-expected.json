@@ -1,0 +1,18 @@
+{
+  "annotation_version": "1.0.0",
+  "annotation_method": "manual",
+  "review_note": "人工维护的静态规则预期，框架依据为项目锁定的 DRF 3.18.1 routers/viewsets；不是执行轨迹。",
+  "root_urlconf": "root_urls.py",
+  "view": {"file_path": "views.py", "start_line": 6, "end_line": 7},
+  "serializer": {"file_path": "serializers.py", "start_line": 6, "end_line": 9},
+  "model": {"file_path": "models.py", "start_line": 4, "end_line": 5},
+  "registration": {"file_path": "router_urls.py", "start_line": 6, "end_line": 6},
+  "endpoints": [
+    ["GET", "/api/tasks/$", "list"],
+    ["POST", "/api/tasks/$", "create"],
+    ["GET", "/api/tasks/(?P<pk>[^/.]+)/$", "retrieve"],
+    ["PUT", "/api/tasks/(?P<pk>[^/.]+)/$", "update"],
+    ["PATCH", "/api/tasks/(?P<pk>[^/.]+)/$", "partial_update"],
+    ["DELETE", "/api/tasks/(?P<pk>[^/.]+)/$", "destroy"]
+  ]
+}

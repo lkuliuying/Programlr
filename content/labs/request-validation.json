@@ -1,0 +1,13 @@
+{
+  "id": "request-validation",
+  "version": "1",
+  "title": "请求校验与真实写入",
+  "example_version": "task-board/1.0.0+request-validation/1",
+  "description": "先预测四种标题的响应与新增记录数，再请求独立内置任务簿。运行结果仅代表此受控示例，不执行导入项目。",
+  "cases": [
+    {"id": "normal", "title": "正常标题", "input": {"title": "实验任务"}},
+    {"id": "missing", "title": "缺失标题", "input": {}},
+    {"id": "empty", "title": "空字符串", "input": {"title": ""}},
+    {"id": "whitespace", "title": "纯空白", "input": {"title": "   "}}
+  ]
+}

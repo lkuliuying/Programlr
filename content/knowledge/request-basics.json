@@ -1,0 +1,7 @@
+[
+  {"slug":"http","version":"1.0.0","title":"HTTP：请求与响应","body":"一次 POST 请求包含方法、路径、请求头和正文。任务簿在新建成功时返回 201；同一幂等操作重放返回 200。400 表示输入无效，不代表网络断开。网络超时不能证明服务端没有处理请求。","applicability":"HTTP 基础及 task-board/1.0.0；示例的具体状态必须结合其接口契约。","review_note":"编码代理对照示例 View、契约及测试逐项核对；不代表用户独立审阅。"},
+  {"slug":"validation","version":"1.0.0","title":"输入校验与数据库约束","body":"前端表单校验改善体验，不能替代服务端校验。TaskSerializer 的 title 必填、不允许 null 或空白，去除首尾空白后最长 200 字符。is_valid 成功后才调用创建服务；数据库另以约束保护非空白标题。","applicability":"task-board/1.0.0 的标题创建；不将示例规则套用到任意项目。","review_note":"编码代理对照 TaskSerializer、模型约束与非法标题测试核对；不代表用户独立审阅。"},
+  {"slug":"serialization","version":"1.0.0","title":"序列化器的输入与输出","body":"序列化器既校验外部输入，也定义输出字段。validated_data 是通过校验后的数据，不应直接把未经校验的 request.data 交给 ORM。字段声明不会自动证明业务权限或并发安全。","applicability":"DRF 基础及 task-board/1.0.0 的 TaskSerializer。","review_note":"编码代理对照示例服务调用和序列化器声明核对；不代表用户独立审阅。"},
+  {"slug":"orm","version":"1.0.0","title":"ORM、持久化与幂等","body":"任务簿通过 ORM get_or_create 按操作键获取或创建记录，数据库唯一约束保护并发重复提交。同一操作键不能对应不同规范化标题。数据库保存成功与浏览器收到响应是两个不同事件；未知结果应使用原操作键恢复。","applicability":"Django ORM 基础及 task-board/1.0.0；不声称所有调用恰好执行一次。","review_note":"编码代理对照 create_task、唯一约束及并发幂等测试核对；不代表用户独立审阅。"},
+  {"slug":"react-state","version":"1.0.0","title":"React 状态与查询刷新","body":"表单输入属于局部交互状态，任务列表是服务端数据。创建成功的 onSuccess 使列表查询失效，再次 GET 后页面展示新列表。创建成功但刷新列表失败时，要区分保存结果和列表读取错误；取消浏览器请求不等于取消服务端操作。","applicability":"React 与 TanStack Query 基础及 task-board/1.0.0。","review_note":"编码代理对照 TaskBoard 的 mutation、onSuccess 和查询行为测试核对；不代表用户独立审阅。"}
+]

@@ -1,0 +1,403 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:learning-lab:typescript-analysis:1.0.0",
+  "title": "受控前端静态解析协议",
+  "$defs": {
+    "source_ref": {
+      "type": "object",
+      "properties": {
+        "snapshot_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "file_path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "start_line": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "end_line": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": ["snapshot_id", "file_path", "start_line", "end_line"],
+      "additionalProperties": false
+    },
+    "evidence": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "enum": ["source_fact", "static_inference", "framework_rule"]
+        },
+        "rule": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "source_ref": {
+          "$ref": "#/$defs/source_ref"
+        }
+      },
+      "required": ["kind", "rule", "source_ref"],
+      "additionalProperties": false
+    },
+    "function": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "source_ref": {
+          "$ref": "#/$defs/source_ref"
+        },
+        "entry_points": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/evidence"
+          },
+          "maxItems": 10000,
+          "minItems": 0
+        }
+      },
+      "required": ["id", "name", "source_ref", "entry_points"],
+      "additionalProperties": false
+    },
+    "request": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "owner_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "method": {
+          "anyOf": [
+            {
+              "enum": [
+                "GET",
+                "POST",
+                "PUT",
+                "PATCH",
+                "DELETE",
+                "HEAD",
+                "OPTIONS",
+                "TRACE"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "original_path": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 8192
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "path": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 8192
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "resolution": {
+          "enum": [
+            "static",
+            "unknown_base",
+            "dynamic",
+            "external",
+            "unsupported"
+          ]
+        },
+        "source_ref": {
+          "$ref": "#/$defs/source_ref"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/evidence"
+          },
+          "maxItems": 10000,
+          "minItems": 1
+        }
+      },
+      "required": [
+        "id",
+        "owner_id",
+        "method",
+        "original_path",
+        "path",
+        "resolution",
+        "source_ref",
+        "evidence"
+      ],
+      "additionalProperties": false
+    },
+    "relation": {
+      "type": "object",
+      "properties": {
+        "source_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "target_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "relation": {
+          "enum": [
+            "direct_call",
+            "contains_function",
+            "contains_request",
+            "callback_binding"
+          ]
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/evidence"
+          },
+          "maxItems": 10000,
+          "minItems": 1
+        }
+      },
+      "required": ["source_id", "target_id", "relation", "evidence"],
+      "additionalProperties": false
+    },
+    "diagnostic": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z_]*$"
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "severity": {
+          "const": "warning"
+        },
+        "source_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/source_ref"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": ["code", "message", "severity", "source_ref"],
+      "additionalProperties": false
+    },
+    "coverage": {
+      "type": "object",
+      "properties": {
+        "source_files": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "parsed_files": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "syntax_failed_files": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "function_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "request_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "complete": {
+          "type": "boolean"
+        },
+        "limitations": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 8192
+          },
+          "maxItems": 10000,
+          "minItems": 0
+        }
+      },
+      "required": [
+        "source_files",
+        "parsed_files",
+        "syntax_failed_files",
+        "function_count",
+        "request_count",
+        "complete",
+        "limitations"
+      ],
+      "additionalProperties": false
+    },
+    "input": {
+      "type": "object",
+      "properties": {
+        "protocol_version": {
+          "const": "typescript-analysis/1.0.0"
+        },
+        "snapshot_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "sources": {
+          "type": "array",
+          "maxItems": 2000,
+          "items": {
+            "type": "object",
+            "properties": {
+              "file_path": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1024
+              },
+              "content": {
+                "type": "string",
+                "maxLength": 1048576
+              }
+            },
+            "required": ["file_path", "content"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["protocol_version", "snapshot_id", "sources"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "protocol_version": {
+          "const": "typescript-analysis/1.0.0"
+        },
+        "rule_version": {
+          "enum": ["typescript-react/1.0.0", "typescript-react/1.1.0"]
+        },
+        "snapshot_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "functions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/function"
+          },
+          "maxItems": 10000,
+          "minItems": 0
+        },
+        "requests": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/request"
+          },
+          "maxItems": 10000,
+          "minItems": 0
+        },
+        "relations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/relation"
+          },
+          "maxItems": 10000,
+          "minItems": 0
+        },
+        "diagnostics": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/diagnostic"
+          },
+          "maxItems": 10000,
+          "minItems": 0
+        },
+        "coverage": {
+          "$ref": "#/$defs/coverage"
+        }
+      },
+      "required": [
+        "protocol_version",
+        "rule_version",
+        "snapshot_id",
+        "functions",
+        "requests",
+        "relations",
+        "diagnostics",
+        "coverage"
+      ],
+      "additionalProperties": false
+    },
+    "failure": {
+      "type": "object",
+      "properties": {
+        "protocol_version": {
+          "const": "typescript-analysis/1.0.0"
+        },
+        "failure": {
+          "enum": [
+            "invalid_input",
+            "input_limit",
+            "ast_node_limit",
+            "result_limit",
+            "invalid_output",
+            "output_limit",
+            "unexpected_emit",
+            "parser_failed"
+          ]
+        }
+      },
+      "required": ["protocol_version", "failure"],
+      "additionalProperties": false
+    }
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/input"
+    },
+    {
+      "$ref": "#/$defs/output"
+    },
+    {
+      "$ref": "#/$defs/failure"
+    }
+  ]
+}

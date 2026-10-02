@@ -1,0 +1,226 @@
+{
+  "example_version": "task-board/1.0.0",
+  "files": {
+    "backend/apps/tasks/api/serializers.py": "9ce18330b269face54331fafee2de4c145a178f2f8080ca8fbfa31d0b24700d6",
+    "backend/apps/tasks/api/urls.py": "61c086661cd629be80a016d8d3ab0a2878df57edbf5cccc7283a515e255b742d",
+    "backend/apps/tasks/api/views.py": "2b4f9932eeb8df169a8b865fa7947779dd8649834ac3f96209d3d6b9b5c35da5",
+    "backend/apps/tasks/models.py": "3c1098a15fda3453ccc0d9afba0acaacff4158cbb37514303142f71f08fac3ce",
+    "backend/apps/tasks/services.py": "65d960fe13a381c6a8614a0f543fd0d4026f94bb6e95f597f8fe8b682a29728f",
+    "backend/config/urls.py": "9181c7a2bc7fa8276146ded00602e09137934924e1e4ff9f66140d14a3d1271e",
+    "frontend/src/features/tasks/TaskBoard.tsx": "89339899d7b90916d3bfe6dc4054fc19fb9c776c9c1959265bc0c6a8280019aa",
+    "frontend/src/features/tasks/api/tasks-api.ts": "3122f97bc27db3fd2634b2ebffef410b1576d74738cd2f5dba84fcb16a6389a6",
+    "frontend/src/shared/api/client.ts": "72b46f58cf02fa1d297d3e6e02ff28420ffffa23a3a6e1f1df0b53c47911fe2f"
+  },
+  "exercises": [
+    {
+      "slug": "create-task-order",
+      "version": "1.0.0",
+      "answer_version": "1.0.0",
+      "kind": "flow_order",
+      "question": "将一次正常新建任务的关键阶段按先后排序。假设来源、CSRF 和操作键有效，数据库与网络正常。",
+      "hint": "区分服务端保存、浏览器收到响应与列表重新读取；框架回调是调度关系。",
+      "options": [
+        {
+          "id": "persist",
+          "label": "ORM 创建记录"
+        },
+        {
+          "id": "submit",
+          "label": "提交表单标题"
+        },
+        {
+          "id": "refresh",
+          "label": "查询失效并重新 GET 列表"
+        },
+        {
+          "id": "validate",
+          "label": "服务端序列化器校验"
+        },
+        {
+          "id": "request",
+          "label": "createTask 发送 POST"
+        },
+        {
+          "id": "success",
+          "label": "客户端执行成功回调"
+        }
+      ],
+      "answer": [
+        "submit",
+        "request",
+        "validate",
+        "persist",
+        "success",
+        "refresh"
+      ],
+      "explanation": "表单提交经 createTask 发出请求；View 先 is_valid，再把 validated_data 交给 create_task。成功响应触发 onSuccess 和列表查询失效，随后读取列表。该顺序是人工维护的功能流程，不等于全部运行调用栈。",
+      "source_refs": [
+        {
+          "file_path": "frontend/src/features/tasks/TaskBoard.tsx",
+          "start_line": 131,
+          "end_line": 134
+        },
+        {
+          "file_path": "frontend/src/features/tasks/TaskBoard.tsx",
+          "start_line": 93,
+          "end_line": 109
+        },
+        {
+          "file_path": "frontend/src/features/tasks/TaskBoard.tsx",
+          "start_line": 34,
+          "end_line": 43
+        },
+        {
+          "file_path": "frontend/src/features/tasks/api/tasks-api.ts",
+          "start_line": 68,
+          "end_line": 87
+        },
+        {
+          "file_path": "backend/config/urls.py",
+          "start_line": 9,
+          "end_line": 9
+        },
+        {
+          "file_path": "backend/apps/tasks/api/urls.py",
+          "start_line": 5,
+          "end_line": 5
+        },
+        {
+          "file_path": "backend/apps/tasks/api/views.py",
+          "start_line": 36,
+          "end_line": 70
+        },
+        {
+          "file_path": "backend/apps/tasks/api/serializers.py",
+          "start_line": 8,
+          "end_line": 30
+        },
+        {
+          "file_path": "backend/apps/tasks/services.py",
+          "start_line": 7,
+          "end_line": 14
+        },
+        {
+          "file_path": "backend/apps/tasks/models.py",
+          "start_line": 6,
+          "end_line": 17
+        },
+        {
+          "file_path": "frontend/src/features/tasks/TaskBoard.tsx",
+          "start_line": 46,
+          "end_line": 59
+        },
+        {
+          "file_path": "frontend/src/features/tasks/TaskBoard.tsx",
+          "start_line": 28,
+          "end_line": 31
+        }
+      ],
+      "review_note": "编码代理逐项对照 task-board/1.0.0 源码、人工关系基准和现有行为测试核对；不代表用户独立审阅。"
+    },
+    {
+      "slug": "title-errors",
+      "version": "1.0.0",
+      "answer_version": "1.0.0",
+      "kind": "error_prediction",
+      "question": "直接 POST 创建任务时，预测四种标题输入的响应状态和新增记录数。每个场景使用不同的新操作键，来源与 CSRF 有效，无并发写入或基础设施故障。",
+      "hint": "必填、去除首尾空白及不允许空白分别处理；校验失败不会进入创建服务。",
+      "options": [
+        {
+          "id": "valid",
+          "label": "正常标题：学习请求校验"
+        },
+        {
+          "id": "missing",
+          "label": "正文未提供 title"
+        },
+        {
+          "id": "empty",
+          "label": "title 为空字符串"
+        },
+        {
+          "id": "whitespace",
+          "label": "title 仅包含空格、制表符和换行"
+        }
+      ],
+      "answer": {
+        "valid": {
+          "status": 201,
+          "writes": 1
+        },
+        "missing": {
+          "status": 400,
+          "writes": 0
+        },
+        "empty": {
+          "status": 400,
+          "writes": 0
+        },
+        "whitespace": {
+          "status": 400,
+          "writes": 0
+        }
+      },
+      "explanation": "TaskSerializer 要求 title 为非空白字符串。有效标题新建返回 201 并写入一条记录；缺失、空字符串或去除空白后为空都在 is_valid 处拒绝为 400。这是题目的固定预期，不是一次实验观测。",
+      "source_refs": [
+        {
+          "file_path": "backend/apps/tasks/api/views.py",
+          "start_line": 36,
+          "end_line": 70
+        },
+        {
+          "file_path": "backend/apps/tasks/api/serializers.py",
+          "start_line": 8,
+          "end_line": 30
+        },
+        {
+          "file_path": "backend/apps/tasks/services.py",
+          "start_line": 7,
+          "end_line": 14
+        },
+        {
+          "file_path": "backend/apps/tasks/models.py",
+          "start_line": 6,
+          "end_line": 17
+        }
+      ],
+      "review_note": "编码代理逐项对照 task-board/1.0.0 源码、人工关系基准和现有行为测试核对；不代表用户独立审阅。"
+    },
+    {
+      "slug": "title-location",
+      "version": "1.0.0",
+      "answer_version": "1.0.0",
+      "kind": "code_location",
+      "question": "定位负责 title 必填、空白、长度及去除首尾空白规则的完整字段声明：选择文件，并填写从 title = 开始至对应右括号结束的行号（包含首尾）。",
+      "hint": "字段规则位于 API 输入边界；模型的数据库约束承担另一层保护。",
+      "options": [
+        {
+          "id": "backend/apps/tasks/api/serializers.py",
+          "label": "backend/apps/tasks/api/serializers.py"
+        },
+        {
+          "id": "backend/apps/tasks/services.py",
+          "label": "backend/apps/tasks/services.py"
+        },
+        {
+          "id": "backend/apps/tasks/models.py",
+          "label": "backend/apps/tasks/models.py"
+        }
+      ],
+      "answer": {
+        "file_path": "backend/apps/tasks/api/serializers.py",
+        "start_line": 9,
+        "end_line": 15
+      },
+      "explanation": "这些 HTTP 输入规则由 TaskSerializer.title 的 CharField 声明负责；View 调用 is_valid 触发校验，数据库约束不是此题要求的 HTTP 字段声明。",
+      "source_refs": [
+        {
+          "file_path": "backend/apps/tasks/api/serializers.py",
+          "start_line": 9,
+          "end_line": 15
+        }
+      ],
+      "review_note": "编码代理逐项对照 task-board/1.0.0 源码、人工关系基准和现有行为测试核对；不代表用户独立审阅。"
+    }
+  ]
+}

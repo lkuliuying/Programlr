@@ -1,0 +1,20 @@
+{
+  "id": "container-network",
+  "version": "1",
+  "title": "容器网络：两种寻址",
+  "example_version": "system-labs/1.0.0",
+  "description": "在 Worker 所在网络命名空间内，分别探测固定 localhost:8000 与 task-board-api:8000；先预测，再查看实际 DNS 和 TCP 结果。连接成功只说明本次端口可达，不表示导入项目已运行。",
+  "cases": [
+    {
+      "id": "first",
+      "title": "容器内 localhost",
+      "prediction_label": "预测 localhost:8000 能否连接"
+    },
+    {
+      "id": "second",
+      "title": "共享网络的服务名",
+      "prediction_label": "预测 task-board-api:8000 能否连接"
+    }
+  ],
+  "program_digest": "011ef832d25bfe69b25a7e1b2e83c6be9a5ac3be7fdd1e45d04481b8699dd69d"
+}

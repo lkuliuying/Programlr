@@ -1,0 +1,20 @@
+{
+  "id": "subprocess-lifecycle",
+  "version": "1",
+  "title": "子进程：退出与回收",
+  "example_version": "system-labs/1.0.0",
+  "description": "固定程序先输出 ready。正常模式继续输出 completed 并退出，等待上限 2 秒；超时模式等待 5 秒，观察方在 0.5 秒后终止并 wait。预测是否能在期限内正常退出，再核对 PID、实际输出和回收；只运行可信固定程序。",
+  "cases": [
+    {
+      "id": "first",
+      "title": "正常退出",
+      "prediction_label": "预测正常模式能否在期限内正常退出"
+    },
+    {
+      "id": "second",
+      "title": "超时终止",
+      "prediction_label": "预测超时模式能否在期限内正常退出"
+    }
+  ],
+  "program_digest": "011ef832d25bfe69b25a7e1b2e83c6be9a5ac3be7fdd1e45d04481b8699dd69d"
+}

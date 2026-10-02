@@ -1,0 +1,30 @@
+{
+  "slug": "task-board-foundations",
+  "version": "1.0.0",
+  "title": "任务簿：功能与系统基础",
+  "example_version": "task-board/1.0.0",
+  "review_note": "编码代理按当前示例与实验逐项核对；先修关系是显式教学安排，不是代码依赖或独立人工验收。",
+  "nodes": [
+    {"slug":"http","card_version":"1.0.0"},
+    {"slug":"validation","card_version":"1.0.0"},
+    {"slug":"serialization","card_version":"1.0.0"},
+    {"slug":"orm","card_version":"1.0.0"},
+    {"slug":"react-state","card_version":"1.0.0"},
+    {"slug":"prerequisite-graph","card_version":"1.0.0"},
+    {"slug":"container-network","card_version":"1.0.0"},
+    {"slug":"process-lifecycle","card_version":"1.0.0"}
+  ],
+  "edges": [
+    {"prerequisite":"http","dependent":"validation"},
+    {"prerequisite":"validation","dependent":"serialization"},
+    {"prerequisite":"serialization","dependent":"orm"},
+    {"prerequisite":"http","dependent":"react-state"},
+    {"prerequisite":"http","dependent":"container-network"}
+  ],
+  "goals": {
+    "create-task": ["orm", "react-state"],
+    "container-network": ["container-network"],
+    "subprocess": ["process-lifecycle"],
+    "prerequisites": ["prerequisite-graph"]
+  }
+}

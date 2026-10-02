@@ -627,7 +627,10 @@ test('从学习上下文返回全图时清理接口专属记录，保留同快�
   );
   await screen.findByRole('heading', { name: '知识与学习', level: 1 });
   fireEvent.click(screen.getByRole('button', { name: '静态关系图' }));
-  fireEvent.click(await screen.findByRole('button', { name: '查看全图' }));
+  const current = within(
+    await screen.findByRole('region', { name: '静态关系图' }),
+  );
+  fireEvent.click(await current.findByRole('button', { name: '查看全图' }));
   await waitFor(() =>
     expect(readSelection(window.location.search).endpoint).toBeNull(),
   );
@@ -646,8 +649,10 @@ test('接口范围返回全图后点击接口节点保持全图，不发起新�
   show(
     `?project=${project}&snapshot=${snapshot}&analysis=${analysis}&endpoint=0&section=graph`,
   );
-  fireEvent.click(await screen.findByRole('button', { name: '查看全图' }));
-  const current = within(screen.getByRole('region', { name: '静态关系图' }));
+  const current = within(
+    await screen.findByRole('region', { name: '静态关系图' }),
+  );
+  fireEvent.click(await current.findByRole('button', { name: '查看全图' }));
   const target = await current.findByRole('button', {
     name: /^GET \/api\/task-summary\//,
   });
@@ -1136,10 +1141,9 @@ test('删除侧栏装饰和全局项目横幅后，各页面保留导航与工�
     expect(screen.queryByRole('button', { name: '打开项目' })).toBeNull();
     if (label === '工作台') {
       expect(
-        within(screen.getByRole('region', { name: '工作台页面' })).getByRole(
-          'heading',
-          { name: projectDto.name, level: 2 },
-        ),
+        await within(
+          screen.getByRole('region', { name: '工作台页面' }),
+        ).findByRole('heading', { name: projectDto.name, level: 2 }),
       ).toBeTruthy();
       expect(screen.getByText('已接收源码')).toBeTruthy();
     } else {
@@ -1151,6 +1155,35 @@ test('删除侧栏装饰和全局项目横幅后，各页面保留导航与工�
   expect(readSelection(window.location.search).project).toBe(project);
   expect(readSelection(window.location.search).snapshot).toBe(snapshot);
   expect(posts).toEqual([]);
+});
+
+test('点击品牌返回工作台保留项目快照和未提交表单，不重新加载或写入', async () => {
+  const writes: string[] = [];
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (path: string, options: RequestInit) => {
+      if (options.method === 'POST') writes.push(path);
+      return response(reads(path));
+    }),
+  );
+  show(`?project=${project}&snapshot=${snapshot}&section=import`);
+  await screen.findByLabelText('导入源码 ZIP');
+  fireEvent.change(screen.getByRole('textbox', { name: '项目名称' }), {
+    target: { value: '尚未提交的草稿' },
+  });
+  fireEvent.click(screen.getByRole('link', { name: '项目解读实验室首页' }));
+  expectModule('工作台');
+  expect(readSelection(window.location.search)).toMatchObject({
+    project,
+    snapshot,
+    section: 'workbench',
+  });
+  fireEvent.click(screen.getByRole('button', { name: '项目导入' }));
+  expect(screen.getByRole('textbox', { name: '项目名称' })).toHaveProperty(
+    'value',
+    '尚未提交的草稿',
+  );
+  expect(writes).toEqual([]);
 });
 
 test('快照命名草稿仅在导入和对比页可见，跨 11 页与双主题保留且不自动写入', async () => {

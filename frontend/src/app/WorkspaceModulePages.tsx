@@ -5,6 +5,7 @@ import type {
   SourceFile,
 } from '../shared/api/generated/schema';
 import { Icon } from '../shared/components/Icon';
+import { snapshotDisplayName } from '../features/projects';
 import type { WorkspaceSection } from './workspace-location';
 
 type PageProps = { active: boolean; children: ReactNode };
@@ -43,6 +44,8 @@ export function WorkbenchPage({
   snapshot,
   files,
   analysis,
+  loading = false,
+  unavailable = false,
   onSection,
 }: {
   active: boolean;
@@ -50,86 +53,197 @@ export function WorkbenchPage({
   snapshot: Snapshot | undefined;
   files: SourceFile[] | undefined;
   analysis: string | null;
+  loading?: boolean;
+  unavailable?: boolean;
   onSection: (section: WorkspaceSection) => void;
 }) {
   const python = files?.filter((file) => file.file_path.endsWith('.py')).length;
   const frontend = files?.filter((file) =>
     /\.(tsx?|jsx?)$/.test(file.file_path),
   ).length;
+  const step = !project ? 0 : !snapshot ? 1 : !analysis ? 2 : 3;
+  const next = [
+    ['创建或打开项目', 'import', '先建立一个学习空间，再导入想要读懂的源码。'],
+    [
+      '导入源码 ZIP',
+      'import',
+      '项目已打开。导入源码后，可以阅读文件并选择根路由进行分析。',
+    ],
+    [
+      '选择根路由并分析',
+      'api',
+      '快照已准备好。显式选择根路由文件，开始一次静态分析。',
+    ],
+    [
+      '继续阅读 API',
+      'api',
+      '已选择分析记录。从一条接口出发，核对定义、调用关系和源码依据。',
+    ],
+  ] as const;
+  const current = next[step]!;
+  const steps = [
+    {
+      title: '打开学习项目',
+      description: '创建项目，或继续已有项目。',
+      section: 'import',
+      ready: !!project,
+      enabled: true,
+    },
+    {
+      title: '导入源码快照',
+      description: project
+        ? '选择 ZIP，保留这一次的源码版本。'
+        : '先打开项目，再选择源码 ZIP。',
+      section: 'import',
+      ready: !!snapshot,
+      enabled: !!project,
+    },
+    {
+      title: '选择静态分析',
+      description: snapshot
+        ? '选择根路由提交分析，或读取已有记录。'
+        : '导入快照后，再查看接口与静态关系。',
+      section: 'api',
+      ready: !!analysis,
+      enabled: !!snapshot,
+    },
+  ] as const;
   return (
     <ModulePage
       active={active}
       section="workbench"
       title="工作台"
-      description="确认项目准备状态，选择下一步阅读与学习。"
+      description="从源码出发，逐步理解接口、数据流与背后的知识。"
     >
-      <div className="workbench-module-grid">
-        <section className="surface module-summary">
-          <h2>{project?.name ?? '打开一个学习项目'}</h2>
-          <p>导入源码仅供只读分析，学习与实验使用固定可信内容。</p>
-          <dl className="module-facts">
-            <div>
-              <dt>已接收源码</dt>
-              <dd>
-                {snapshot
-                  ? `${snapshot.summary.accepted} 个文件`
-                  : '尚未选择快照'}
-              </dd>
-            </div>
-            <div>
-              <dt>Python 源码</dt>
-              <dd>{python === undefined ? '未读取' : `${python} 个文件`}</dd>
-            </div>
-            <div>
-              <dt>前端源码</dt>
-              <dd>
-                {frontend === undefined ? '未读取' : `${frontend} 个文件`}
-              </dd>
-            </div>
-          </dl>
-          <ol className="readiness-list">
-            <li>项目：{project ? '已打开' : '等待选择'}</li>
-            <li>快照：{snapshot ? '已选择' : '等待导入或选择'}</li>
-            <li>
-              分析：
-              {analysis
-                ? '已选择记录，请在 API 分析核对结果'
-                : '等待选择或显式提交'}
-            </li>
-          </ol>
-          <div className="module-actions">
-            <button
-              className="primary-button"
-              onClick={() => onSection(project && snapshot ? 'api' : 'import')}
-            >
-              {project && snapshot ? '进入 API 分析' : '前往项目导入'}
-            </button>
-            <button onClick={() => onSection('source')}>打开源码阅读</button>
-          </div>
+      {loading || unavailable ? (
+        <section className="surface workbench-focus">
+          <h2>{unavailable ? '当前项目暂不可用' : '正在读取当前项目…'}</h2>
+          <p role={unavailable ? undefined : 'status'}>
+            {unavailable
+              ? '请使用上方错误提示重试，或重新选择项目与快照。'
+              : '读取完成后，将显示当前快照和适合继续的步骤。'}
+          </p>
+          {unavailable && (
+            <button onClick={() => onSection('import')}>重新选择项目</button>
+          )}
         </section>
-        <section className="surface module-summary">
-          <h2>下一步</h2>
-          <ol className="module-next-steps">
-            <li>
-              <button onClick={() => onSection('api')}>从一条接口开始</button>
-              <p>核对方法、路径、后端对象和前端请求来源。</p>
-            </li>
-            <li>
-              <button onClick={() => onSection('learning')}>
-                建立知识路径
+      ) : (
+        <div className="workbench-module-grid">
+          <section className="surface workbench-focus">
+            <span className="workbench-eyebrow">
+              {project ? '继续你的项目' : '开始使用'}
+            </span>
+            <h2>{project?.name ?? '从一个项目开始，读懂一条调用链'}</h2>
+            <p className="workbench-intro">{current[2]}</p>
+            <div className="module-actions">
+              <button
+                className="primary-button"
+                onClick={() => onSection(current[1])}
+              >
+                {current[0]}
+                <Icon name="arrow" />
               </button>
-              <p>阅读已发布卡片，确认先修知识。</p>
-            </li>
-            <li>
-              <button onClick={() => onSection('labs')}>完成练习与实验</button>
-              <p>先作答和预测，再查看反馈与实际观测。</p>
-            </li>
-          </ol>
-          <button className="text-button" onClick={() => onSection('jobs')}>
-            查看系统与任务
-          </button>
-        </section>
-      </div>
+              {snapshot && (
+                <button onClick={() => onSection('source')}>
+                  打开源码阅读
+                </button>
+              )}
+            </div>
+            {snapshot ? (
+              <div className="workbench-snapshot">
+                <p>
+                  <span>当前快照</span>
+                  <strong>{snapshotDisplayName(snapshot)}</strong>
+                </p>
+                <dl className="module-facts">
+                  <div>
+                    <dt>已接收源码</dt>
+                    <dd>
+                      {snapshot.summary.accepted} <small>个文件</small>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Python 源码</dt>
+                    <dd>
+                      {python === undefined ? '读取中' : python}{' '}
+                      <small>个文件</small>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>前端源码</dt>
+                    <dd>
+                      {frontend === undefined ? '读取中' : frontend}{' '}
+                      <small>个文件</small>
+                    </dd>
+                  </div>
+                </dl>
+              </div>
+            ) : (
+              <div className="workbench-preparation">
+                <h3>开始前，准备这些就够了</h3>
+                <ul>
+                  <li>一个 DRF + React 项目的源码 ZIP，大小不超过 20 MiB。</li>
+                  <li>打包前移除密钥、环境配置、依赖和构建产物。</li>
+                </ul>
+                <p>导入仅用于只读分析，不会安装依赖或执行你的项目。</p>
+              </div>
+            )}
+          </section>
+          <section
+            className="surface workbench-guide"
+            aria-label="项目准备步骤"
+          >
+            <h2>项目准备</h2>
+            <ol className="workbench-steps">
+              {steps.map((item, index) => (
+                <li
+                  key={item.title}
+                  data-state={
+                    item.ready
+                      ? 'ready'
+                      : index === step
+                        ? 'current'
+                        : 'waiting'
+                  }
+                  aria-current={index === step ? 'step' : undefined}
+                >
+                  <span className="workbench-step-number" aria-hidden="true">
+                    {String(index + 1).padStart(2, '0')}
+                  </span>
+                  <div>
+                    <button
+                      disabled={!item.enabled}
+                      onClick={() => onSection(item.section)}
+                    >
+                      {item.title}
+                    </button>
+                    <small>
+                      {item.ready
+                        ? '已选择'
+                        : index === step
+                          ? '当前步骤'
+                          : '待准备'}
+                    </small>
+                    <p>{item.description}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+            <div className="workbench-shortcuts">
+              <button
+                className="text-button"
+                onClick={() => onSection('learning')}
+              >
+                先浏览知识卡片
+                <Icon name="arrow" />
+              </button>
+              <button className="text-button" onClick={() => onSection('jobs')}>
+                查看系统与任务
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </ModulePage>
   );
 }

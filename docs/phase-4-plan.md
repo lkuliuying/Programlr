@@ -363,9 +363,9 @@
 | 任务 | 目标 | 状态 |
 | --- | --- | --- |
 | M22-T01 | Git 配置、原件核对、四批基线 | 已完成 |
-| M22-T02 | 导入限制一致、立即反馈、显式提交和恢复 | 已实现，聚焦测试通过；待综合复核 |
-| M22-T03 | 从真实页面审阅引导、视觉层级和导航，按证据改进 | 进行中 |
-| M22-T04 | 综合回归、浏览器检查、文档一致性与本地提交 | 待完成 |
+| M22-T02 | 导入限制一致、立即反馈、显式提交和恢复 | 已完成；组件边界和真实浏览器导入通过 |
+| M22-T03 | 从真实页面审阅引导、视觉层级和导航，按证据改进 | 已完成；状态、草稿和模态键盘复核通过 |
+| M22-T04 | 综合回归、浏览器检查、文档一致性与本地提交 | 已完成；前端、真实主线与最终范围核对见 8.5–8.7 |
 
 ### 8.3 导入改进及聚焦验证
 
@@ -384,3 +384,63 @@
 | frontend | `node node_modules/typescript/bin/tsc --noEmit`（导入改进后） | 通过 |
 
 运行环境恢复与最终浏览器结果在后续段落记录；未完成的验收不能沿用历史结果冒称本轮通过。
+
+### 8.4 首页与窄屏导航迭代
+
+审阅发现：首次进入时原工作台展示多项尚未读取的统计，却缺少清楚的首个动作；点击品牌使用整页链接会丢失当前上下文和未提交草稿；窄屏导航仅覆盖部分页面，缺少背景隔离与焦点约束。
+
+`WorkbenchPage` 现在按无项目、仅项目、有快照、已选分析四种状态提供唯一主要入口，以三步准备清单说明当前进度。统计只在已有快照时展示；加载和不可用状态由共享查询传入。保留现有配色、字体与独立模块，使用主内容/准备清单布局和窄屏单列，不恢复已移除的宣传或全局横幅，不自动选择根路由或启动任务。
+
+`WorkspaceShell` 使用原生模态 dialog，导航项共用同一组件；开启聚焦当前模块，Tab/Shift+Tab 在首尾循环，关闭、Escape、遮罩均结束模态并返回按钮焦点，放大到桌面后解除模态。打开时暂停背景滚动并屏蔽搜索快捷键的背景跳转。品牌普通点击沿现有 History API 返回工作台，项目/快照及表单实例保留，修饰键点击沿用链接行为。没有新依赖、接口、迁移或业务存储变化。
+
+### 8.5 最终前端验证
+
+以下命令工作目录均为 `frontend`，PATH 首项为已固定的 `.runtime/tools/node-v24.21.0-win-x64`，不修改工具版本、锁文件或测试配置。
+
+| 实际命令 | 观察结果 |
+| --- | --- |
+| `node node_modules/vitest/vitest.mjs run --configLoader native --pool threads --reporter=default --reporter=json --outputFile.json=../.runtime/user-review-20261002/final-vitest.json` | 27 文件、151 项全部通过，237.59 秒；原 131 项保留，新增 20 项 |
+| `node node_modules/vitest/vitest.mjs run src/app/WorkspacePage.test.tsx src/app/WorkspaceShell.test.tsx src/app/WorkbenchPage.test.tsx --configLoader native --pool threads --reporter=json --outputFile=../.runtime/user-review-20261002/final-navigation.json` | 导航组件最后调整后的 33 项全部通过，无跳过 |
+| `node node_modules/typescript/bin/tsc --noEmit` | 通过 |
+| `node node_modules/eslint/bin/eslint.js . --max-warnings 0` | 通过，警告 0 |
+| `node node_modules/prettier/bin/prettier.cjs --check .` | 全量通过 |
+| `node tooling/generate-api-types.mjs --check` | 本地契约与前端类型一致 |
+| `node node_modules/vitest/vitest.mjs run src/app/WorkspaceShell.test.tsx --configLoader native --pool threads` | 最后导航调整后 6 项通过，5.16 秒 |
+| `node node_modules/vite/bin/vite.js build --configLoader native` | 1582 模块构建通过；JS 601.07 kB/gzip 188.55 kB、CSS 37.54 kB/gzip 8.08 kB |
+
+中途失败均已定位：jsdom 缺少原生 dialog 方法，测试局部补充并在清理时还原，真实背景隔离另以浏览器验证；首页异步摘要等待实际数据；两个原关系图用例改为先等待真实图 region，再在区域内查询按钮，未增大超时或删除业务断言。类型检查发现测试误用了 Playwright 的 exact 选项，已移除；lint 拒绝渲染函数内传递访问 ref 的回调，改为独立导航组件，事件中访问 ref。最终检查均重新执行通过。
+
+保留既有 500 kB 构建告警；`LearningV03.test.tsx` 中合成数据重复 key 的 React 警告也仍存在，该文件及学习实现未改动，测试通过但不能称全程无警告。不通过拆包、放宽规则或屏蔽日志掩盖这些问题。
+
+### 8.6 运行环境恢复与真实浏览器
+
+最初 Docker Linux 引擎和 5181 不可用，Desktop 日志报告 `dockerInference` 监听文件无法访问。普通启动、停止未恢复；核实后只终止本轮启动失败的 Desktop 进程并重新启动。尝试将旧监听文件改名留存也失败，没有移动该文件、清空目录、修改配置或删除数据卷。随后引擎恢复，最终提升权限的 `docker version` 确认 Server 29.4.0/desktop-linux；沙箱内读取 named pipe 的 permission denied 单独属于权限限制，不能据此判断引擎仍故障。
+
+只恢复原 `learning-lab-v1-verify-8e9c1a0a0101` 的已核对容器。恢复脚本检查容器/网络/卷的 Compose 标签、5181 回环绑定、空模型配置和健康状态；原容器身份保留。随后给旧前端镜像加备份标签，沿用 `infra/docker/frontend.Dockerfile` 和锁文件构建，仅更新该项目 frontend，其他服务身份不变。模型仍关闭，未执行迁移、更新日常实例或修改旧快照。
+
+| 工作目录 | 实际命令或检查 | 观察结果 |
+| --- | --- | --- |
+| 根目录 | `& 'C:/Program Files/Docker/Docker/resources/bin/docker.exe' version` | 沙箱首次 named pipe 拒绝；提升后的同一只读命令取得 Client/Server 29.4.0 |
+| 根目录 | `& '.runtime/m1-t02-venv/Scripts/python.exe' -B -X utf8 .runtime/user-review-20261002/restore_reference.py` | 9 个既有运行服务恢复，模型关闭、数据保留 |
+| 根目录 | `& '.runtime/m1-t02-venv/Scripts/python.exe' -B -X utf8 .runtime/user-review-20261002/update_reference_frontend.py` | 仅验收 frontend 改变；JS/CSS/theme-init 三项资产与已测本地产物逐字节相同，CSP 存在，旧快照与文件保持 |
+| 根目录 | `& '.runtime/m1-t02-venv/Scripts/python.exe' -B -X utf8 .runtime/user-review-20261002/verify_runtime.py` | 真实 9 文件与 ZIP 摘要一致、7 个接口、42 节点/49 边；新项目只有 1 次导入和 1 次分析，模型任务/作答均 0，原教学快照保持 |
+
+最后一个辅助核对脚本首次将仅 POST 的快照分析路径用于 GET，得到 405；查证 `AnalysisNavigator` 和 `queryJobs` 后改为原任务查询 `kind=analysis&snapshot_id=…`，重新核对通过，未改产品接口或放宽断言。
+
+浏览器先在临时 5182 开发入口验证展示与键盘，明确该阶段无可用 API；环境恢复后在更新后的 5181 完成真实主线，不能把早期页面显示当作后端证据。以新项目“用户视角验收 2026-10-02”验证：非 ZIP、0 字节、20 MiB+1 字节均显示具体原因且禁用提交；移除后焦点回到文件控件；选择 10,184 字节的 `test/task-board.zip`，经品牌返回再进入导入，文件仍保留；显式导入成功接收 9 文件，再显式选择 `backend/config/urls.py` 提交分析成功。
+
+首页分别显示项目已开、快照就绪、分析已选的主要入口，真实文件数为 9/6/3（全部/Python/前端），刷新保留同一项目、快照和分析。进入 POST 接口、关系图后“查看全图”显示 42/42 节点和 49/49 边，URL 清除 endpoint；源码页实际读取 views.py 和固定的 TaskBoard.tsx，后者按 200 行分段。已有静态诊断和部分覆盖提示保持，没有将图等同于运行链路。
+
+两主题的桌面与窄屏首页、模态菜单已实际查看。请求视口为 1280×800、390×844，实际 CSS 视口为 1243×777、379×819；文档宽度不超过实际视口。键盘正反向循环、Escape、遮罩关闭、焦点返回、放大窗口解除模态通过；有快照且搜索可用时，菜单中的 Ctrl+K 仍不移焦到背景。品牌返回保留项目名称草稿；合成草稿已清空，未提交。最终恢复浏览器原尺寸，保留 5181 供查看。
+
+证据仅放在忽略的 `.runtime/user-review-20261002`：`browser-workflow.json`、`http-verified.json`、`runtime-restored.json`、`runtime-updated.json`、测试 JSON、原件清单及 01–11 实际截图。其中 01–08 是开发入口的视觉/键盘证据，09–11 是真实验收入口，不能混淆。重启后的 HTTP/Worker 主线是本轮实测，不沿用昨日的 ready 标记。
+
+### 8.7 文档同步与最终边界
+
+已读并同步 AGENTS、README、需求、路线图、项目结构、前端规范及本阶段计划。新增 FR-22/AT-64–66，记录准备引导、20 MiB 前端边界、未知恢复、模态导航和品牌返回；本节唯一记录进度与证据。路线图 6.3 的组合布局和“没有新增 API”落后于先前已完成的独立模块/API-57，经源代码、现有契约及 7.7 历史核对后校正，未改写历史验收结论。旧“无 Git”仅是历史状态，本轮授权和当前 main 另行说明；没有建立独立记忆系统。
+
+本轮本地工程验收不代表真实用户试用、任意项目识别率、其他浏览器或平台兼容、真实供应商质量或容量承诺。后端和依赖未变化，因此没有重复全量后端/固定实验回归；未知网络结果恢复以组件受控测试验证，没有人为断开真实服务。后续优先观察真人在根路由选择和首个接口上的卡点，再决定增强，不自动扩展产品边界。
+
+最终在根目录执行 `& '.runtime/m1-t02-venv/Scripts/python.exe' -B -X utf8 .runtime/user-review-20261002/verify_review.py`：500 个基线 Git blob 与原件清单逐项相等；基线之后 14 份原文件修改、486 份保持、新增 4 份前端源码/测试，无删除或意外路径；112 个本地文档文件链接存在。`git diff 57a7874 --check` 通过，指定凭据格式扫描无命中，跟踪清单未包含敏感配置、运行数据、依赖、IDE 或构建产物，没有远程。完整差异保存在忽略证据目录，暂存前按明确路径逐项核对。
+
+导入反馈提交为 `3c6d4f5`，首页与导航连同本节记录以 `feat: 改进项目准备引导与窄屏导航` 单独提交；精确提交哈希以本地 `git log` 为准。四个基线提交保留在前，没有合并或改写历史。临时 5182 开发进程已停止，最终可查看入口为已核验的 5181；旧前端镜像备份保留在本地，不删除测试数据卷。

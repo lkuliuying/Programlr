@@ -251,6 +251,13 @@ function WorkspaceContent({
         snapshot={snapshot.data}
         files={files.data}
         analysis={selection.analysis}
+        loading={
+          !!selection.project &&
+          (project.isPending ||
+            (!!selection.snapshot && snapshot.isPending) ||
+            (!!snapshot.data && files.isPending))
+        }
+        unavailable={!!(project.error ?? snapshot.error ?? files.error)}
         onSection={onSection}
       />
       <ImportPage active={section === 'import'}>

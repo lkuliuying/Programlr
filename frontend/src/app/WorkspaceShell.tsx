@@ -17,6 +17,32 @@ export const navigation = [
   ['explanation', '模型讲解'],
   ['jobs', '系统与任务'],
 ] as const;
+function NavigationLinks({
+  section,
+  onSelect,
+}: {
+  section: WorkspaceSection;
+  onSelect: (section: WorkspaceSection) => void;
+}) {
+  return (
+    <nav aria-label="功能导航">
+      <ul>
+        {navigation.map(([value, label]) => (
+          <li key={value}>
+            <button
+              title={label}
+              aria-current={section === value ? 'page' : undefined}
+              onClick={() => onSelect(value)}
+            >
+              <Icon name={value} />
+              <span>{label}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  );
+}
 export function WorkspaceShell({
   children,
   section,
@@ -36,24 +62,30 @@ export function WorkspaceShell({
   const [menuOpen, setMenuOpen] = useState(false);
   const searchInput = useRef<HTMLInputElement>(null);
   const menuButton = useRef<HTMLButtonElement>(null);
+  const menuDialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     function shortcut(event: KeyboardEvent) {
       if (
         (event.ctrlKey || event.metaKey) &&
         event.key.toLowerCase() === 'k' &&
-        searchable
+        searchable &&
+        !menuOpen
       ) {
         event.preventDefault();
         searchInput.current?.focus();
-      }
-      if (event.key === 'Escape' && menuOpen) {
-        setMenuOpen(false);
-        menuButton.current?.focus();
       }
     }
     window.addEventListener('keydown', shortcut);
     return () => window.removeEventListener('keydown', shortcut);
   }, [searchable, menuOpen]);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onResize = () => {
+      if (window.innerWidth >= 768) menuDialog.current?.close();
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [menuOpen]);
   return (
     <div className="workspace app-shell">
       <a className="skip-link" href="#workspace-main">
@@ -64,12 +96,35 @@ export function WorkspaceShell({
           ref={menuButton}
           className="icon-button mobile-menu"
           aria-label="功能导航"
+          aria-haspopup="dialog"
+          aria-controls="workspace-navigation"
           aria-expanded={menuOpen}
-          onClick={() => setMenuOpen(!menuOpen)}
+          onClick={() => {
+            menuDialog.current?.showModal();
+            setMenuOpen(true);
+            menuDialog.current
+              ?.querySelector<HTMLButtonElement>('[aria-current="page"]')
+              ?.focus();
+          }}
         >
           <Icon name="menu" />
         </button>
-        <a className="app-brand" href="/" aria-label="项目解读实验室首页">
+        <a
+          className="app-brand"
+          href="/"
+          aria-label="项目解读实验室首页"
+          onClick={(event) => {
+            if (
+              event.ctrlKey ||
+              event.metaKey ||
+              event.altKey ||
+              event.shiftKey
+            )
+              return;
+            event.preventDefault();
+            onSection('workbench');
+          }}
+        >
           <LabMark />
           <strong>项目解读实验室</strong>
         </a>
@@ -122,32 +177,63 @@ export function WorkspaceShell({
         </span>
       </header>
       <div className="shell-body">
-        <aside className="app-sidebar" data-open={menuOpen}>
-          <nav aria-label="功能导航">
-            <ul>
-              {navigation.map(([value, label]) => (
-                <li key={value}>
-                  <button
-                    title={label}
-                    aria-current={section === value ? 'page' : undefined}
-                    onClick={() => {
-                      onSection(value);
-                      setMenuOpen(false);
-                      if (menuOpen) menuButton.current?.focus();
-                    }}
-                  >
-                    <Icon name={value} />
-                    <span>{label}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </nav>
+        <aside className="app-sidebar">
+          <NavigationLinks section={section} onSelect={onSection} />
         </aside>
         <main id="workspace-main" className="shell-main" tabIndex={-1}>
           {children}
         </main>
       </div>
+      <dialog
+        ref={menuDialog}
+        id="workspace-navigation"
+        className="navigation-dialog"
+        aria-label="功能导航菜单"
+        onKeyDown={(event) => {
+          if (event.key !== 'Tab') return;
+          const buttons =
+            event.currentTarget.querySelectorAll<HTMLButtonElement>('button');
+          const first = buttons[0],
+            last = buttons[buttons.length - 1];
+          if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last?.focus();
+          } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first?.focus();
+          }
+        }}
+        onCancel={(event) => {
+          event.preventDefault();
+          event.currentTarget.close();
+        }}
+        onClose={() => {
+          setMenuOpen(false);
+          if (window.innerWidth < 768) menuButton.current?.focus();
+        }}
+        onClick={(event) => {
+          if (event.target === event.currentTarget) event.currentTarget.close();
+        }}
+      >
+        <div className="navigation-dialog-content">
+          <header>
+            <h2>功能导航</h2>
+            <button
+              aria-label="关闭功能导航"
+              onClick={() => menuDialog.current?.close()}
+            >
+              关闭
+            </button>
+          </header>
+          <NavigationLinks
+            section={section}
+            onSelect={(value) => {
+              onSection(value);
+              menuDialog.current?.close();
+            }}
+          />
+        </div>
+      </dialog>
     </div>
   );
 }

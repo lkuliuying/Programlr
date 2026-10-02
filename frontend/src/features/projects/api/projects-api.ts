@@ -13,6 +13,7 @@ import type {
 } from '../../../shared/api/generated/schema';
 import * as v from '../../../shared/api/validation';
 import { parseJob } from '../../jobs';
+import { archiveValidationMessage } from '../archive-validation';
 
 export function parseProject(value: unknown): Project {
   const item = v.object(value);
@@ -93,12 +94,8 @@ export const importArchive = (
   key: string,
   signal: AbortSignal,
 ) => {
-  if (
-    !file.name.toLowerCase().endsWith('.zip') ||
-    !file.size ||
-    file.size > 25 * 1024 * 1024
-  )
-    throw new ApiError('请选择不超过 25 MiB 的 ZIP 文件。', 400);
+  const error = archiveValidationMessage(file);
+  if (error) throw new ApiError(error, 400);
   const body = new FormData();
   body.append('archive', file);
   return submitBody(

@@ -2,10 +2,10 @@
 
 | 项目 | 内容 |
 | --- | --- |
-| 文档版本 | v0.6 |
+| 文档版本 | v0.7 |
 | 产品版本 | v1.0 稳定个人作品 |
-| 更新日期 | 2026-10-01 |
-| 本文职责 | M16–M21 及试用补充交付的唯一进度、验证证据和恢复入口 |
+| 更新日期 | 2026-10-02 |
+| 本文职责 | M16–M22 及试用补充交付的唯一进度、验证证据和恢复入口 |
 
 ## 1. 授权与前置核对
 
@@ -338,3 +338,49 @@
 最终原件基线共 140 份，其中 18 份既有 Python 缓存单独识别为生成物；122 份源码/契约/文档原件中 41 份修改、81 份摘要不变，无删除，新增 7 份相关源码或测试。未初始化 Git。完整差异由主代理和模块代理复核；133 个本地文档文件链接存在，既有 11 张预览图片摘要与清单保持。本轮证据、差异、完整变更清单、截图及非敏感原件只放在既有忽略目录 `.runtime/browser-comments-20261001`，不成为新的项目记忆系统。
 
 已读并同步 AGENTS、README、需求、结构、前后端规范、API 规范/清单与本阶段。核对发现当前契约计数及早期 UI 预算/断点/无新增后端边界描述落后于用户追加范围，已按实际 57 操作、独立源码布局、图内展示和明确授权的名称迁移修正，历史验证结论保留。无独立项目记忆文件。未改依赖、锁文件、安全中间件、模型策略、教学源码或 test ZIP；保留静态预算、单快照无法生成真实差异及既有构建包大小告警，不将工程检查当作真人试用。
+
+
+<a id="user-review"></a>
+## 8. M22 用户视角审阅与迭代（2026-10-02）
+
+### 8.1 授权、基线与验收范围
+
+用户明确授权自主审阅和迭代功能、视觉与交互，并要求先配置 Git、分批提交现有项目、同步文档和路线图。已读取 AGENTS、README、需求、路线图、项目结构、前端规范及本阶段计划；没有独立项目记忆文件，继续使用既有文档。此前“无 Git”的记录是当时事实，本轮已建立本地 main；不推送或配置远程，不调用模型、不运行导入源码、不替代真实试用。
+
+500 份非敏感工程文件在 `.runtime/user-review-20261002/baseline-inventory.json` 留存路径/大小/SHA-256；既有 `.env`、运行数据、依赖、缓存保留并忽略，新加 `.idea/` 忽略。扫描未发现指定凭据格式或敏感路径。沿用既有 Git 身份，core.autocrlf=false 保留文件字节，core.whitespace 的 cr-at-eol 识别现有 Windows 行尾；不进行全库行尾转换。
+
+| 基线提交 | 内容 | 文件数 |
+| --- | --- | --- |
+| d407674 | 文档与运行配置 | 49 |
+| 7bb8622 | 后端、解析器、教学内容与契约 | 217 |
+| c0b3d8a | 11 个模块的前端工作台 | 108 |
+| 57a7874 | 教学样例、验证脚本与测试输入 | 126 |
+
+提交后的 500 个 Git blob 与清单逐项摘要一致，基线工作区干净。基线 `git diff --cached --check` 的两处原有 EOF 空行分别位于 `docs/previews/module-pages/index.html` 与 `examples/task-board/backend/pyproject.toml`，保留原件，没有为通过检查重排无关文件。其余组通过。后续改动使用 `git diff --check` 单独校验。
+
+### 8.2 迭代任务
+
+| 任务 | 目标 | 状态 |
+| --- | --- | --- |
+| M22-T01 | Git 配置、原件核对、四批基线 | 已完成 |
+| M22-T02 | 导入限制一致、立即反馈、显式提交和恢复 | 已实现，聚焦测试通过；待综合复核 |
+| M22-T03 | 从真实页面审阅引导、视觉层级和导航，按证据改进 | 进行中 |
+| M22-T04 | 综合回归、浏览器检查、文档一致性与本地提交 | 待完成 |
+
+### 8.3 导入改进及聚焦验证
+
+原 `ProjectNavigator` 提示和 `importArchive` 校验是 25 MiB，核对后端 `ImportLimits.archive_bytes`、`.env.example` 的默认值均为 20 MiB，前端现统一为 20 MiB。`archive-validation.ts` 供表单和 API 入口复用；扩展名、空文件、超限立即说明原因，在摘要计算与写入恢复键之前阻止无效输入。选中文件显示真实名称与字节数，可移除并返回文件控件焦点；未选择/无效文件禁用提交，处理中不能更换文件。前端校验不替代后端归档校验，定制后端更小上限仍以服务端拒绝为准。
+
+未知结果继续保留原幂等键与摘要，移除已选文件不代表取消服务端任务；重新选同一内容才能恢复，不能自动重试。按钮用显式可访问名称隔离组件库加载图标。没有更改 API、Schema、后端限制、导入只读策略或模型策略。
+
+固定工具：根目录 `.runtime/tools/node-v24.21.0-win-x64/node.exe`（24.21.0），`.runtime/m1-t02-venv/Scripts/python.exe`（3.13.15）。frontend 命令通过该 Node 执行。
+
+| 工作目录 | 实际命令或检查 | 观察结果 |
+| --- | --- | --- |
+| frontend | `node node_modules/vitest/vitest.mjs run --configLoader native --pool threads`（改动前） | 24 文件、131 项通过，135.69 秒 |
+| frontend | `node node_modules/typescript/bin/tsc --noEmit`、`node node_modules/eslint/bin/eslint.js . --max-warnings 0`（改动前） | 通过 |
+| frontend | `node node_modules/vitest/vitest.mjs run src/features/projects/ImportForm.test.tsx src/app/WorkspacePage.test.tsx --configLoader native --pool threads` | 工作区 20 项通过；新增 7 项中恢复用例首次因 jsdom 文件控件原生校验未触发表单而失败 |
+| frontend | `node node_modules/vitest/vitest.mjs run src/features/projects/ImportForm.test.tsx --configLoader native --pool threads` | 修正文件事件测试入口后发现加载图标改变按钮名称；补显式 aria-label 后 7 项通过，4.86 秒，保留全部断言 |
+| frontend | `node node_modules/typescript/bin/tsc --noEmit`（导入改进后） | 通过 |
+
+运行环境恢复与最终浏览器结果在后续段落记录；未完成的验收不能沿用历史结果冒称本轮通过。

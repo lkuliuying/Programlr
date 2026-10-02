@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from 'antd';
 import type { Job, Project } from '../../shared/api/generated/schema';
@@ -12,6 +12,7 @@ import {
   listSnapshots,
 } from './api/projects-api';
 import { snapshotDisplayName } from './snapshot-name';
+import { archiveValidationMessage } from './archive-validation';
 
 export function ProjectNavigator({
   projectId,
@@ -161,6 +162,11 @@ export function ImportForm({
   onJob: (id: string) => void;
 }) {
   const [file, setFile] = useState<File | null>(null);
+  const [submittedFile, setSubmittedFile] = useState<File | null>(null);
+  const input = useRef<HTMLInputElement>(null);
+  const helpId = useId();
+  const errorId = useId();
+  const validation = file ? archiveValidationMessage(file) : null;
   const operation = useIdempotentOperation<File, Job>(
     `import.${projectId}`,
     (file) => file,
@@ -170,29 +176,72 @@ export function ImportForm({
   );
   return (
     <form
-      className="workspace-form"
+      className="workspace-form archive-import"
       onSubmit={(event) => {
         event.preventDefault();
-        if (file) operation.start(file);
+        if (file && !validation) {
+          setSubmittedFile(file);
+          operation.start(file);
+        }
       }}
     >
       <label>
         导入源码 ZIP
         <input
+          ref={input}
           type="file"
           required
           accept=".zip"
+          disabled={operation.isPending}
+          aria-invalid={!!validation}
+          aria-describedby={`${helpId}${validation ? ` ${errorId}` : ''}`}
           onChange={(event) => setFile(event.target.files?.[0] ?? null)}
         />
       </label>
-      <small>仅静态读取；不会安装依赖或运行导入项目。上限 25 MiB。</small>
-      <Button htmlType="submit" loading={operation.isPending}>
+      <small id={helpId}>
+        ZIP 上限 20 MiB。仅静态读取，不会安装依赖或运行导入项目。
+      </small>
+      {file && (
+        <div className="archive-selection">
+          <div role="status">
+            <strong>{file.name}</strong>
+            <small>
+              {file.size.toLocaleString('zh-CN')} 字节 · 上限 20 MiB
+            </small>
+          </div>
+          <button
+            type="button"
+            disabled={operation.isPending}
+            onClick={() => {
+              setFile(null);
+              if (input.current) {
+                input.current.value = '';
+                input.current.focus();
+              }
+            }}
+          >
+            移除文件
+          </button>
+        </div>
+      )}
+      {validation && (
+        <p id={errorId} role="alert" className="archive-validation">
+          {validation}
+        </p>
+      )}
+      <Button
+        htmlType="submit"
+        type="primary"
+        aria-label={operation.pending ? '恢复原 ZIP 导入' : '导入为新快照'}
+        loading={operation.isPending}
+        disabled={!file || !!validation}
+      >
         {operation.pending ? '恢复原 ZIP 导入' : '导入为新快照'}
       </Button>
       {operation.pending && (
         <small>请重新选择原 ZIP，以相同操作标识恢复提交。</small>
       )}
-      <Feedback error={operation.error} />
+      <Feedback error={submittedFile === file ? operation.error : null} />
     </form>
   );
 }

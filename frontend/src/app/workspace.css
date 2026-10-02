@@ -1457,6 +1457,44 @@
   grid-template-columns: minmax(260px, 1fr) minmax(0, 1.5fr);
   gap: 18px;
 }
+.archive-import input[type='file'] {
+  width: 100%;
+  padding: 16px;
+  border-style: dashed;
+}
+.archive-import input[type='file']::file-selector-button {
+  margin-right: 12px;
+  padding: 7px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  color: var(--text);
+  background: var(--panel-raised);
+  cursor: pointer;
+}
+.archive-selection {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--code);
+}
+.archive-selection > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.archive-selection small {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.archive-validation {
+  color: var(--error);
+}
 .api-module-grid {
   display: grid;
   grid-template-columns: 230px minmax(0, 1fr);

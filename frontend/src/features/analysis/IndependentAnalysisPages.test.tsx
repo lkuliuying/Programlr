@@ -74,6 +74,7 @@ const analysisDto: Analysis = {
   job_id: id(5),
   snapshot_id: snapshot,
   root_urlconf: 'urls.py',
+  source_scan_id: null,
   rule_version: 'fixture',
   coverage,
   frontend: null,
@@ -280,6 +281,7 @@ test('API 页面只展示真实定义和请求来源，不读取关系图或挂�
   expect(await screen.findByText('TaskCreateView')).toBeTruthy();
   expect(screen.getByText('TaskSerializer')).toBeTruthy();
   expect(screen.getByText(/未决候选 · 修订 0/)).toBeTruthy();
+  expect(screen.getByRole('table', { name: '接口清单' })).toBeTruthy();
   const sources = screen.getAllByRole('button', { name: 'views.py:10–20' });
   fireEvent.click(sources[0]);
   expect(onSource).toHaveBeenCalledWith(reference);
@@ -296,6 +298,23 @@ test('API 页面只展示真实定义和请求来源，不读取关系图或挂�
   expect(reviewApi.listReviews).not.toHaveBeenCalled();
   expect(screen.queryByRole('region', { name: '静态关系图' })).toBeNull();
   expect(screen.queryByRole('region', { name: '候选人工处理' })).toBeNull();
+});
+
+test('接口清单空状态可读，诊断默认折叠并可显式打开', async () => {
+  vi.mocked(api.listEndpoints).mockResolvedValue(page([]));
+  show(<AnalysisBrowser {...apiProps} endpoint={null} />);
+  expect(
+    await screen.findByText('当前规则未发现后端接口，请核对诊断与覆盖限制。'),
+  ).toBeTruthy();
+  expect(screen.getByRole('table', { name: '接口清单' })).toBeTruthy();
+  const summary = screen.getByText('诊断与缺口', { selector: 'summary' });
+  const diagnostics = summary.closest('details');
+  expect(diagnostics?.open).toBe(false);
+  fireEvent.click(summary);
+  expect(diagnostics?.open).toBe(true);
+  expect(screen.getByRole('region', { name: '诊断与缺口' })).toBeTruthy();
+  expect(api.getGraph).not.toHaveBeenCalled();
+  expect(reviewApi.submitReview).not.toHaveBeenCalled();
 });
 
 test('接口地址选中清单另一页时读取对应页定义，不错误显示其他接口', async () => {

@@ -30,6 +30,7 @@ export type WorkspaceSelection = {
   run: string | null;
   system_run: string | null;
   curriculum: string | null;
+  course: string | null;
   goal: string | null;
   panel: 'source' | 'explanation' | 'learning' | 'lab' | null;
   comparison: string | null;
@@ -83,6 +84,7 @@ export function readSelection(search: string): WorkspaceSelection {
     run = id('run'),
     system_run = id('system_run'),
     curriculum = id('curriculum'),
+    course = id('course'),
     comparison = id('comparison'),
     change = id('change');
   const goal = params.get('goal');
@@ -118,7 +120,6 @@ export function readSelection(search: string): WorkspaceSelection {
     (analysis && !snapshot) ||
     (node && !analysis) ||
     (endpoint !== null && !analysis) ||
-    (job && !project) ||
     (comparison && !project) ||
     (change && !comparison) ||
     ((preview ||
@@ -177,6 +178,7 @@ export function readSelection(search: string): WorkspaceSelection {
     run,
     system_run,
     curriculum,
+    course,
     goal,
     panel,
     comparison,
@@ -206,7 +208,8 @@ export function resolveWorkspaceSection(
     return selection.panel === 'lab' ? 'labs' : selection.panel;
   if (selection.reference) return 'source';
   if (selection.run || selection.system_run || selection.attempt) return 'labs';
-  if (selection.curriculum || selection.goal) return 'learning';
+  if (selection.course || selection.curriculum || selection.goal)
+    return 'learning';
   if (selection.preview || selection.explanation) return 'explanation';
   if (selection.comparison) return 'comparison';
   return 'workbench';
@@ -231,6 +234,7 @@ export function useWorkspaceLocation() {
         'run',
         'system_run',
         'curriculum',
+        'course',
         'goal',
         'panel',
         'comparison',

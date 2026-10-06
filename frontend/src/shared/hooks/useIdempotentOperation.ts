@@ -89,6 +89,10 @@ export function useIdempotentOperation<T, R>(
                 'RELATION_REVISION_CONFLICT',
                 'RELATION_NOT_CANDIDATE',
                 'COMPARISON_SCOPE_MISMATCH',
+                'DELETION_PREVIEW_STALE',
+                'RESOURCE_BUSY',
+                'RESOURCE_DELETING',
+                'DELETION_COMPLETE',
               ].includes(error.code ?? '')))
         ) {
           sessionStorage.removeItem(storage);

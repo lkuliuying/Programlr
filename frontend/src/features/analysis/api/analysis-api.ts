@@ -83,6 +83,7 @@ export function parseAnalysis(
   const result = {
     id: v.uuid(item.id),
     job_id: v.uuid(item.job_id),
+    source_scan_id: v.nullable(item.source_scan_id ?? null, v.uuid),
     snapshot_id: v.uuid(item.snapshot_id),
     root_urlconf: v.sourcePath(item.root_urlconf),
     rule_version: v.text(item.rule_version),
@@ -168,6 +169,7 @@ export function parseGraph(
     graph_version: v.oneOf(item.graph_version, [
       'analysis-graph/1.0.0',
       'analysis-graph/2.0.0',
+      'shared-interface/1.0.0',
     ]),
     rule_version: v.text(item.rule_version),
     root_node_id: v.nullable(item.root_node_id, v.uuid),
@@ -304,12 +306,16 @@ export const listEndpoints = (
   id: string,
   page: number,
   signal: AbortSignal,
+  query?: string,
 ) =>
   requestJson(
-    `/api/v1/analyses/${id}/endpoints/?page=${page}&page_size=20`,
+    `/api/v1/analyses/${id}/endpoints/?page=${page}&page_size=20${query ? '&q=' + encodeURIComponent(query) : ''}`,
     (value) =>
-      v.page(value, `/api/v1/analyses/${id}/endpoints/`, (value) =>
-        parseEndpoint(value, snapshot),
+      v.page(
+        value,
+        `/api/v1/analyses/${id}/endpoints/`,
+        (value) => parseEndpoint(value, snapshot),
+        ['q'],
       ),
     { signal },
   );

@@ -1,0 +1,91 @@
+.record-list {
+  min-width: 0;
+}
+
+.record-list--table .ant-table-cell {
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.record-list--table .ant-table-tbody > tr.record-list__selected > td {
+  background: var(--accent-soft);
+}
+
+.record-list .record-choice {
+  padding: 2px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--accent-text);
+  text-align: left;
+  line-height: 1.6;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.record-list .record-choice:hover {
+  text-decoration: underline;
+  background: transparent;
+}
+
+.record-list .record-choice:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.record-list--cards {
+  display: grid;
+  gap: 8px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.record-list--cards > li {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel);
+  overflow-wrap: anywhere;
+}
+
+.record-list--cards > li.record-list__selected {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.record-list__title {
+  font-weight: 600;
+}
+
+.record-list--cards dl {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 0;
+}
+
+.record-list--cards dl > div {
+  display: grid;
+  grid-template-columns: minmax(70px, 28%) minmax(0, 1fr);
+  gap: 8px;
+}
+
+.record-list--cards dt {
+  color: var(--muted);
+}
+
+.record-list--cards dd {
+  min-width: 0;
+  margin: 0;
+}
+
+.record-list__empty {
+  color: var(--muted);
+}
+
+@media (min-width: 768px) and (max-width: 1199px) {
+  .record-list--table col {
+    width: auto !important;
+  }
+}

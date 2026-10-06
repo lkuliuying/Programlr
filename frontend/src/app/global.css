@@ -1,60 +1,43 @@
 :root {
   font-family: 'Microsoft YaHei', 'PingFang SC', system-ui, sans-serif;
   font-synthesis: none;
-  color-scheme: dark;
-  --canvas: #07141e;
-  --nav: #081823;
-  --panel: #0d202d;
-  --panel-raised: #132b3a;
-  --code: #081923;
-  --text: #e1edf5;
-  --muted: #a4bdcd;
-  --subtle: #829dac;
-  --border: #244656;
-  --border-strong: #39718a;
-  --accent: #16d6af;
-  --accent-text: #35e1c0;
-  --accent-soft: #103a3b;
-  --on-accent: #052d29;
-  --cyan: #46c7f3;
-  --cyan-soft: #12394b;
-  --warning: #f1c070;
-  --warning-soft: #342c1c;
-  --error: #ff9a87;
-  --error-soft: #3c2228;
-  --syntax-keyword: #d2a2ee;
-  --syntax-string: #f0af86;
-  --syntax-comment: #a7be8d;
-  --shadow: 0 3px 18px #03101866;
+  color-scheme: light;
+  --canvas: #f4f8fe;
+  --nav: #ffffff;
+  --panel: #ffffff;
+  --panel-raised: #f6f9ff;
+  --code: #ffffff;
+  --text: #142650;
+  --muted: #5d7095;
+  --subtle: #697d9e;
+  --border: #dce7f6;
+  --border-strong: #a9bddb;
+  --accent: #1767d8;
+  --accent-hover: #1b6bd5;
+  --accent-active: #1359bb;
+  --accent-text: #0958d9;
+  --accent-soft: #eaf3ff;
+  --on-accent: #ffffff;
+  --cyan: #0958d9;
+  --cyan-soft: #eaf3ff;
+  --dashboard-border: #dce7f6;
+  --dashboard-panel: linear-gradient(135deg, #ffffff, #f6f9ff);
+  --hero-background: linear-gradient(115deg, #ffffff, #eff6ff);
+  --dashboard-shadow: 0 6px 24px #23467108;
+  --button-shadow: 0 3px 8px #1767d818;
+  --shell-background: #f4f8fe;
+  --warning: #95610b;
+  --warning-soft: #fff6e8;
+  --error: #c52f40;
+  --error-soft: #fff0f2;
+  --success: #07865d;
+  --success-soft: #e8f8f2;
+  --syntax-keyword: #174ee5;
+  --syntax-string: #b43b28;
+  --syntax-comment: #36744a;
+  --shadow: 0 3px 18px #16394c05;
   color: var(--text);
   background: var(--canvas);
-}
-:root[data-theme='light'] {
-  color-scheme: light;
-  --canvas: #f3f6f9;
-  --nav: #eef4f7;
-  --panel: #fff;
-  --panel-raised: #eaf1f5;
-  --code: #f8fafc;
-  --text: #203340;
-  --muted: #516c7d;
-  --subtle: #597180;
-  --border: #d5e0e7;
-  --border-strong: #93acba;
-  --accent: #007f6a;
-  --accent-text: #007764;
-  --accent-soft: #e0f3ee;
-  --on-accent: #fff;
-  --cyan: #087da8;
-  --cyan-soft: #e4f1f8;
-  --warning: #815311;
-  --warning-soft: #fff4df;
-  --error: #b33725;
-  --error-soft: #ffede8;
-  --syntax-keyword: #8244a1;
-  --syntax-string: #9c492b;
-  --syntax-comment: #486b35;
-  --shadow: 0 3px 18px #16394c0a;
 }
 * {
   box-sizing: border-box;
@@ -84,7 +67,7 @@ button {
   color: var(--text);
   background: var(--panel-raised);
   border: 1px solid var(--border);
-  border-radius: 5px;
+  border-radius: 8px;
   padding: 7px 11px;
   cursor: pointer;
   transition:
@@ -117,7 +100,7 @@ textarea {
   color: var(--text);
   background: var(--code);
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: 8px;
   padding: 7px 9px;
   max-width: 100%;
 }
@@ -178,7 +161,7 @@ summary {
 }
 fieldset {
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: 8px;
   margin: 10px 0;
   min-width: 0;
   padding: 10px;
@@ -209,7 +192,7 @@ label {
 .surface {
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 10px;
   min-width: 0;
   box-shadow: var(--shadow);
 }
@@ -262,9 +245,22 @@ label {
   color: var(--on-accent);
   border-color: var(--accent);
   font-weight: 600;
+  box-shadow: var(--button-shadow);
 }
 .primary-button:hover:not(:disabled) {
-  color: var(--text);
+  color: var(--on-accent);
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+.primary-button:active:not(:disabled) {
+  background: var(--accent-active);
+  border-color: var(--accent-active);
+}
+.primary-button:disabled {
+  box-shadow: none;
+}
+.workspace .ant-btn-primary:not(:disabled) {
+  box-shadow: var(--button-shadow);
 }
 .muted,
 .local-label {
@@ -324,7 +320,7 @@ label {
   padding: 20px;
   background: var(--panel-raised);
   border: 1px solid var(--border);
-  border-radius: 5px;
+  border-radius: 8px;
 }
 .action-panel p {
   font-size: 16px;

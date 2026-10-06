@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from 'antd';
 import type { Snapshot } from '../../shared/api/generated/schema';
 import { Feedback } from '../../shared/components/Feedback';
-import { ContentPager } from '../../shared/components/ContentPager';
+import { ScrollPanel } from '../../shared/components/ScrollPanel';
 import { listSnapshots, renameSnapshot } from './api/projects-api';
 
 export function SnapshotNameForm({ snapshot }: { snapshot: Snapshot }) {
@@ -91,7 +91,7 @@ export function SnapshotNameForm({ snapshot }: { snapshot: Snapshot }) {
           }
         }}
       >
-        <ContentPager label="快照命名" active={open}>
+        <ScrollPanel label="快照命名" active={open}>
           <label>
             快照名称
             <input
@@ -115,7 +115,7 @@ export function SnapshotNameForm({ snapshot }: { snapshot: Snapshot }) {
           </Button>
           <Feedback error={mutation.error} />
           {saved && <p role="status">快照名称已保存。</p>}
-        </ContentPager>
+        </ScrollPanel>
       </form>
     </div>
   );

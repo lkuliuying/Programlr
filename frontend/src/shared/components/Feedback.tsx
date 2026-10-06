@@ -1,5 +1,6 @@
 import { Button } from 'antd';
 import { ApiError } from '../api/client';
+import { ContentState } from './PagePresentation';
 
 export function Feedback({
   error,
@@ -10,12 +11,14 @@ export function Feedback({
 }) {
   if (!error) return null;
   return (
-    <div role="alert" className="workspace-error">
+    <ContentState
+      kind="error"
+      action={retry && <Button onClick={retry}>重新查询</Button>}
+    >
       <p>{error.message}</p>
       {error instanceof ApiError && error.requestId && (
         <small>请求标识：{error.requestId}</small>
       )}
-      {retry && <Button onClick={retry}>重新查询</Button>}
-    </div>
+    </ContentState>
   );
 }

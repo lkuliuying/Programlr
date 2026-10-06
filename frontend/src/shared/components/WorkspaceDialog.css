@@ -1,0 +1,85 @@
+.workspace-dialog {
+  padding: 0;
+  width: min(760px, calc(100vw - 32px));
+  height: min(720px, calc(100dvh - 32px));
+  max-width: calc(100vw - 32px);
+  max-height: calc(100dvh - 32px);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 20px 60px #0006;
+}
+.workspace-dialog::backdrop {
+  background: #020a16bb;
+}
+.workspace-dialog-body {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  padding: 16px;
+  gap: 12px;
+}
+.workspace-dialog-body > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex: none;
+}
+.workspace-dialog-body > header h2 {
+  margin: 0;
+  font-size: 18px;
+}
+.workspace-dialog-body > .scroll-panel {
+  flex: 1;
+  min-height: 0;
+}
+.workspace-dialog input {
+  width: 100%;
+}
+.notification-record {
+  border-bottom: 1px solid var(--border);
+  padding: 12px 0;
+}
+.notification-record p {
+  margin: 0 0 8px;
+  overflow-wrap: anywhere;
+}
+.notification-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.notification-bell {
+  position: relative;
+  width: 38px;
+}
+.notification-bell svg {
+  display: block;
+  width: 22px;
+  height: 22px;
+}
+.notification-bell > span {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: #b42330;
+  color: #fff;
+  font-size: 12px;
+  padding: 0 4px;
+  border-radius: 10px;
+}
+@media (max-width: 767px) {
+  .workspace-dialog {
+    width: calc(100vw - 16px);
+    max-width: calc(100vw - 16px);
+    height: calc(100dvh - 16px);
+    max-height: calc(100dvh - 16px);
+  }
+  .workspace-dialog-body {
+    padding: 12px;
+  }
+}

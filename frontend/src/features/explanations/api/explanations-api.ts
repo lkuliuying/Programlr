@@ -97,6 +97,28 @@ export function parsePreview(
       50,
     ),
     omissions: v.list(item.omissions, (value) => v.text(value)),
+    knowledge_cards: v.list(
+      item.knowledge_cards ?? [],
+      (raw) => {
+        const card = v.object(raw);
+        const digest = v.text(card.content_digest, 64);
+        if (!/^[0-9a-f]{64}$/.test(digest)) return v.invalid();
+        return {
+          card_id: v.uuid(card.card_id),
+          slug: v.text(card.slug),
+          version: v.text(card.version),
+          content_digest: digest,
+          title: v.text(card.title),
+          body: v.text(card.body, Infinity),
+          source_refs: v.list(
+            card.source_refs,
+            (ref) => v.sourceRef(ref, selected.snapshot),
+            100,
+          ),
+        };
+      },
+      100,
+    ),
   };
 }
 export function parseExplanation(

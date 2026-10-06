@@ -10,6 +10,7 @@ import type {
   Snapshot,
   SourceFile,
   SourceContent,
+  SnapshotSearchResult,
 } from '../../../shared/api/generated/schema';
 import * as v from '../../../shared/api/validation';
 import { parseJob } from '../../jobs';
@@ -37,6 +38,14 @@ export function parseSnapshot(value: unknown): Snapshot {
     source_extensions: v.list(item.source_extensions, (value) =>
       v.text(value, 10),
     ),
+    source_manifest_names: v.list(item.source_manifest_names ?? [], (value) =>
+      v.text(value, 255),
+    ),
+    preparation_status: v.text(item.preparation_status ?? 'pending'),
+    source_scan_id: v.nullable(item.source_scan_id ?? null, v.uuid),
+    scan_job_id: v.nullable(item.scan_job_id ?? null, v.uuid),
+    analysis_job_id: v.nullable(item.analysis_job_id ?? null, v.uuid),
+    analysis_id: v.nullable(item.analysis_id ?? null, v.uuid),
     summary: {
       entries: v.integer(summary.entries),
       accepted: v.integer(summary.accepted),
@@ -71,10 +80,14 @@ export function parseFile(value: unknown, snapshotId: string): SourceFile {
     ? result
     : v.invalid();
 }
-export const listProjects = (page: number, signal: AbortSignal) =>
+export const listProjects = (
+  page: number,
+  signal: AbortSignal,
+  query?: string,
+) =>
   requestJson(
-    `/api/v1/projects/?page=${page}&page_size=20`,
-    (value) => v.page(value, '/api/v1/projects/', parseProject),
+    `/api/v1/projects/?page=${page}&page_size=20${query ? '&q=' + encodeURIComponent(query) : ''}`,
+    (value) => v.page(value, '/api/v1/projects/', parseProject, ['q']),
     { signal },
   );
 export const getProject = (id: string, signal: AbortSignal) =>
@@ -121,6 +134,29 @@ export const listSnapshots = (
         const result = parseSnapshot(item);
         return result.project_id === projectId ? result : v.invalid();
       }),
+    { signal },
+  );
+export const searchSnapshots = (
+  page: number,
+  signal: AbortSignal,
+  query: string,
+) =>
+  requestJson(
+    `/api/v1/snapshots/?page=${page}&page_size=20&q=${encodeURIComponent(query)}`,
+    (value) =>
+      v.page(
+        value,
+        '/api/v1/snapshots/',
+        (raw): SnapshotSearchResult => {
+          const item = v.object(raw),
+            snapshot = parseSnapshot(item.snapshot),
+            project = parseProject(item.project);
+          return snapshot.project_id === project.id
+            ? { snapshot, project }
+            : v.invalid();
+        },
+        ['q'],
+      ),
     { signal },
   );
 export const getSnapshot = (

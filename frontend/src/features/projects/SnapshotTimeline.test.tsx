@@ -90,8 +90,8 @@ test('项目有两份快照且每页仅一条时不会误报，分页和快照�
   const { onSelect } = show(2);
   await screen.findByRole('button', { name: /导入快照 · 9 个文件/ });
   expect(screen.queryByText(message)).toBeNull();
-  fireEvent.click(screen.getByRole('button', { name: '下一页' }));
-  await screen.findByText('第 2 页');
+  fireEvent.click(screen.getByRole('button', { name: '下一批记录' }));
+  await screen.findByText('第 2 批');
   const item = await screen.findByRole('button', {
     name: /导入快照 · 9 个文件/,
   });
@@ -111,7 +111,7 @@ test('时间线显示命名，旧空名显示时间回退，不显示内部快�
   show(2);
   await screen.findByText('创建任务基线');
   expect(screen.queryByText(first.slice(0, 8))).toBeNull();
-  fireEvent.click(screen.getByRole('button', { name: '下一页' }));
+  fireEvent.click(screen.getByRole('button', { name: '下一批记录' }));
   await screen.findByText(/未命名快照 ·/);
   expect(screen.queryByText(second.slice(0, 8))).toBeNull();
 });

@@ -9,6 +9,10 @@ import type {
 import { Feedback } from '../../shared/components/Feedback';
 import { PageControls } from '../../shared/components/PageControls';
 import {
+  RecordList,
+  type RecordColumn,
+} from '../../shared/components/RecordList';
+import {
   AnalysisCoverage,
   DiagnosticsPanel,
   EvidenceList,
@@ -54,6 +58,34 @@ export function AnalysisBrowser({
   const selected = selectedEndpoints.data?.results.find(
     (item) => item.index === endpoint,
   );
+  const endpointTitle = (item: Endpoint) => (
+    <button
+      type="button"
+      className="record-choice"
+      aria-current={item.index === endpoint ? 'true' : undefined}
+      onClick={() => onEndpoint(item.index)}
+    >
+      <strong>{item.method}</strong> <code>{item.path}</code>
+    </button>
+  );
+  const endpointColumns: RecordColumn<Endpoint>[] = [
+    { key: 'endpoint', title: '方法与路径', render: endpointTitle },
+    {
+      key: 'action',
+      title: '处理动作',
+      width: 140,
+      render: (item) => <code>{item.action}</code>,
+    },
+    {
+      key: 'frontend',
+      title: '前端关联',
+      width: 180,
+      render: (item) =>
+        item.frontend_available
+          ? `${item.frontend_links.filter((link) => link.status === 'confirmed').length} 确认 · ${item.frontend_links.filter((link) => link.status === 'candidate').length} 候选`
+          : '历史记录未分析前端',
+    },
+  ];
   return (
     <section aria-label="API 分析详情">
       <Feedback
@@ -82,31 +114,24 @@ export function AnalysisBrowser({
                 }}
               />
               {endpoints.isPending && <p role="status">加载接口清单…</p>}
-              <ul className="workspace-nav">
-                {endpoints.data?.results.map((item) => (
-                  <li key={item.index}>
-                    <button
-                      type="button"
-                      aria-current={
-                        item.index === endpoint ? 'true' : undefined
-                      }
-                      onClick={() => onEndpoint(item.index)}
-                    >
-                      <strong>{item.method}</strong> {item.path}
-                      <small>
-                        {item.frontend_available
-                          ? `${item.frontend_links.filter((link) => link.status === 'confirmed').length} 确认 · ${item.frontend_links.filter((link) => link.status === 'candidate').length} 候选`
-                          : '历史记录未分析前端'}
-                      </small>
-                    </button>
-                  </li>
-                ))}
-              </ul>
+              {endpoints.data && (
+                <RecordList
+                  label="接口清单"
+                  records={endpoints.data.results}
+                  columns={endpointColumns}
+                  rowKey={(item) => String(item.index)}
+                  recordTitle={endpointTitle}
+                  titleColumnKey="endpoint"
+                  selectedKey={endpoint === null ? undefined : String(endpoint)}
+                  empty={
+                    endpoints.data.count
+                      ? '当前批次没有接口记录，请查看其他批次。'
+                      : '当前规则未发现后端接口，请核对诊断与覆盖限制。'
+                  }
+                />
+              )}
               {endpoints.data && (
                 <>
-                  {!endpoints.data.count && (
-                    <p>当前规则未发现后端接口，请核对诊断与覆盖限制。</p>
-                  )}
                   <PageControls
                     page={page}
                     {...endpoints.data}
@@ -144,11 +169,14 @@ export function AnalysisBrowser({
               )}
             </section>
             <aside className="relation-evidence" aria-label="接口分析诊断">
-              <DiagnosticsPanel
-                snapshotId={snapshotId}
-                analysisId={analysisId}
-                onSource={onSource}
-              />
+              <details>
+                <summary>诊断与缺口</summary>
+                <DiagnosticsPanel
+                  snapshotId={snapshotId}
+                  analysisId={analysisId}
+                  onSource={onSource}
+                />
+              </details>
             </aside>
           </div>
         </>
@@ -229,7 +257,7 @@ function EndpointDetails({
                     }[link.relation_review.decision]
                   }{' '}
                   · 修订 {link.relation_review.revision} ·
-                  在候选影响模块处理决定。
+                  历史人工决定只读，校准写入已退役。
                 </p>
               )}
             </li>
@@ -237,7 +265,7 @@ function EndpointDetails({
         </ul>
       )}
       <p className="muted">
-        请求字段与响应规则请打开序列化器和视图源码核对；静态关系图与人工决定分别在专属模块查看。
+        请求字段与响应规则请打开序列化器和视图源码核对；源码关联可在工作区关系面板查看。
       </p>
     </>
   );

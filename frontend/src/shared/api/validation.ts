@@ -85,6 +85,7 @@ export function page<T>(
   value: unknown,
   resourcePath: string,
   decode: (item: unknown) => T,
+  allowedFilters: readonly string[] = [],
 ) {
   const item = object(value);
   const link = (value: unknown) =>
@@ -104,6 +105,7 @@ export function page<T>(
               'analysis_id',
               'endpoint_index',
               'request_id',
+              ...allowedFilters,
             ].includes(key) || query.getAll(key).length !== 1,
         ) ||
         !/^[1-9][0-9]*$/.test(query.get('page') ?? '') ||

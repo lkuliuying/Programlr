@@ -1,9 +1,13 @@
 import { useId, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from 'antd';
-import type { Job, Project } from '../../shared/api/generated/schema';
+import type { Job, Project, Snapshot } from '../../shared/api/generated/schema';
 import { Feedback } from '../../shared/components/Feedback';
 import { PageControls } from '../../shared/components/PageControls';
+import {
+  RecordList,
+  type RecordColumn,
+} from '../../shared/components/RecordList';
 import { useIdempotentOperation } from '../../shared/hooks/useIdempotentOperation';
 import {
   createProject,
@@ -13,6 +17,7 @@ import {
 } from './api/projects-api';
 import { snapshotDisplayName } from './snapshot-name';
 import { archiveValidationMessage } from './archive-validation';
+import './ProjectNavigator.css';
 
 export function ProjectNavigator({
   projectId,
@@ -42,6 +47,33 @@ export function ProjectNavigator({
       onProject(project.id);
     },
   );
+  const projectChoice = (project: Project) => (
+    <button
+      type="button"
+      className="project-record-select"
+      aria-current={projectId === project.id ? 'true' : undefined}
+      onClick={() => onProject(project.id)}
+    >
+      {project.name}
+    </button>
+  );
+  const columns: RecordColumn<Project>[] = [
+    {
+      key: 'name',
+      title: '项目',
+      render: projectChoice,
+    },
+    {
+      key: 'created',
+      title: '创建时间',
+      width: 190,
+      render: (project) => (
+        <time dateTime={project.created_at}>
+          {new Date(project.created_at).toLocaleString('zh-CN')}
+        </time>
+      ),
+    },
+  ];
   return (
     <>
       <h2>项目与快照</h2>
@@ -78,19 +110,16 @@ export function ProjectNavigator({
       {projects.isPending && <p role="status">加载项目…</p>}
       {projects.data && (
         <>
-          <ul className="workspace-nav">
-            {projects.data.results.map((project) => (
-              <li key={project.id}>
-                <button
-                  aria-current={projectId === project.id ? 'true' : undefined}
-                  onClick={() => onProject(project.id)}
-                >
-                  {project.name}
-                </button>
-              </li>
-            ))}
-          </ul>
-          {!projects.data.count && <p>还没有项目，先创建一个学习空间。</p>}
+          <RecordList
+            label="项目清单"
+            records={projects.data.results}
+            columns={columns}
+            rowKey={(project) => project.id}
+            recordTitle={projectChoice}
+            titleColumnKey="name"
+            selectedKey={projectId ?? undefined}
+            empty={<p>还没有项目，先创建一个学习空间。</p>}
+          />
           <PageControls page={page} {...projects.data} onPage={setPage} />
         </>
       )}
@@ -119,6 +148,40 @@ function SnapshotNavigator({
     queryKey: ['projects', 'snapshots', projectId, page],
     queryFn: ({ signal }) => listSnapshots(projectId, page, signal),
   });
+  const snapshotChoice = (snapshot: Snapshot) => (
+    <button
+      type="button"
+      className="project-record-select"
+      aria-label={`${snapshotDisplayName(snapshot)} ${new Date(snapshot.created_at).toLocaleString('zh-CN')} ${snapshot.summary.accepted} 个文件`}
+      onClick={() => onSelect(snapshot.id)}
+      aria-current={snapshot.id === selected ? 'true' : undefined}
+    >
+      {snapshotDisplayName(snapshot)}
+    </button>
+  );
+  const columns: RecordColumn<Snapshot>[] = [
+    {
+      key: 'name',
+      title: '快照',
+      render: snapshotChoice,
+    },
+    {
+      key: 'accepted',
+      title: '源码文件',
+      width: 110,
+      render: (snapshot) => <span>{snapshot.summary.accepted} 个文件</span>,
+    },
+    {
+      key: 'created',
+      title: '导入时间',
+      width: 190,
+      render: (snapshot) => (
+        <time dateTime={snapshot.created_at}>
+          {new Date(snapshot.created_at).toLocaleString('zh-CN')}
+        </time>
+      ),
+    },
+  ];
   return (
     <section>
       <h3>源码快照</h3>
@@ -131,23 +194,16 @@ function SnapshotNavigator({
       {query.isPending && <p role="status">加载快照…</p>}
       {query.data && (
         <>
-          <ul className="workspace-nav">
-            {query.data.results.map((snapshot) => (
-              <li key={snapshot.id}>
-                <button
-                  onClick={() => onSelect(snapshot.id)}
-                  aria-current={snapshot.id === selected ? 'true' : undefined}
-                >
-                  <strong>{snapshotDisplayName(snapshot)}</strong>
-                  <time>
-                    {new Date(snapshot.created_at).toLocaleString('zh-CN')}
-                  </time>
-                  <small>{snapshot.summary.accepted} 个文件</small>
-                </button>
-              </li>
-            ))}
-          </ul>
-          {!query.data.count && <p>尚未导入快照。</p>}
+          <RecordList
+            label="快照清单"
+            records={query.data.results}
+            columns={columns}
+            rowKey={(snapshot) => snapshot.id}
+            recordTitle={snapshotChoice}
+            titleColumnKey="name"
+            selectedKey={selected ?? undefined}
+            empty={<p>尚未导入快照。</p>}
+          />
           <PageControls page={page} {...query.data} onPage={setPage} />
         </>
       )}

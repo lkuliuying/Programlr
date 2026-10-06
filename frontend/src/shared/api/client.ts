@@ -119,11 +119,21 @@ export async function patchJson<T>(
   return writeBody(path, decode, JSON.stringify(body), 'PATCH', signal);
 }
 
+export async function deleteJson<T>(
+  path: string,
+  key: string,
+  decode: (value: unknown) => T,
+  body: unknown,
+  signal?: AbortSignal,
+): Promise<T> {
+  return writeBody(path, decode, JSON.stringify(body), 'DELETE', signal, key);
+}
+
 async function writeBody<T>(
   path: string,
   decode: (value: unknown) => T,
   body: string | FormData,
-  method: 'POST' | 'PATCH',
+  method: 'POST' | 'PATCH' | 'DELETE',
   signal?: AbortSignal,
   key?: string,
 ): Promise<T> {

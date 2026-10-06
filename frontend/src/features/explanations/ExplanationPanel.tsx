@@ -6,6 +6,7 @@ import type {
   SourceRef,
 } from '../../shared/api/generated/schema';
 import { Feedback } from '../../shared/components/Feedback';
+import { PageControls } from '../../shared/components/PageControls';
 import { useIdempotentOperation } from '../../shared/hooks/useIdempotentOperation';
 import { getJob } from '../jobs';
 import * as api from './api/explanations-api';
@@ -31,6 +32,22 @@ type Props = {
   }) => void;
   onSource: (ref: SourceRef) => void;
 };
+function ExplanationSteps({ step }: { step: number }) {
+  return (
+    <ol className="explanation-steps" aria-label="讲解步骤">
+      {['准备外发预览', '审阅并保存本次确认', '提交生成与读取结果'].map(
+        (label, index) => (
+          <li
+            key={label}
+            aria-current={step === index + 1 ? 'step' : undefined}
+          >
+            {label}
+          </li>
+        ),
+      )}
+    </ol>
+  );
+}
 export function ExplanationPanel(props: Props) {
   const { selected, previewId, explanationId, jobId, onSelect, onSource } =
     props;
@@ -70,6 +87,7 @@ export function ExplanationPanel(props: Props) {
             '未准备讲解'}
         </span>
       </h3>
+      {!preview.data && <ExplanationSteps step={explanation.data ? 3 : 1} />}
       <p>先审阅完整外发消息，再确认并提交。预览、拒绝和刷新均不会调用模型。</p>
       <Button
         loading={operation.isPending}
@@ -169,21 +187,12 @@ export function ExplanationPanel(props: Props) {
           </button>
         </p>
       ))}
-      <nav aria-label="讲解历史分页">
-        <Button
-          disabled={!history.data?.previous}
-          onClick={() => setHistoryPage(historyPage - 1)}
-        >
-          上一页
-        </Button>
-        <span> 第 {historyPage} 页 </span>
-        <Button
-          disabled={!history.data?.next}
-          onClick={() => setHistoryPage(historyPage + 1)}
-        >
-          下一页
-        </Button>
-      </nav>
+      <PageControls
+        page={historyPage}
+        previous={history.data?.previous ?? null}
+        next={history.data?.next ?? null}
+        onPage={setHistoryPage}
+      />
     </section>
   );
 }
@@ -253,17 +262,20 @@ function PreviewReview({
   );
   const selectedAll =
     nodes.length === preview.nodes.length &&
-    excluded.length === preview.excluded_snippets.length;
+    excluded.length === preview.excluded_snippets.length &&
+    excluded.every((id) => preview.excluded_snippets.includes(id));
   const jobValid =
     job.data?.kind === 'explanation' &&
     job.data.snapshot_id === preview.snapshot_id;
   const legacyPreview =
+    preview.template_version !== '1.1.0' ||
     preview.configuration.timeout !== undefined ||
     preview.configuration.context_bytes !== undefined ||
     preview.configuration.output_tokens !== undefined ||
     preview.configuration.token_field !== undefined;
   return (
     <div className="context-preview">
+      <ExplanationSteps step={consent ? 3 : 2} />
       <h4>待发送内容</h4>
       <dl>
         <dt>固定目标</dt>
@@ -299,6 +311,26 @@ function PreviewReview({
         遗漏或截断：{preview.omissions.join('、') || '无'}
         。静态关系不代表运行时必然发生。
       </p>
+      {!!preview.knowledge_cards?.length && (
+        <details>
+          <summary>
+            本次匹配的知识卡片（{preview.knowledge_cards.length}）
+          </summary>
+          {preview.knowledge_cards.map((card) => (
+            <article key={card.card_id}>
+              <h5>
+                {card.title} · {card.version}
+              </h5>
+              <p>{card.body}</p>
+              {card.source_refs.map((ref, index) => (
+                <button key={index} onClick={() => onSource(ref)}>
+                  {ref.file_path}:{ref.start_line}–{ref.end_line}
+                </button>
+              ))}
+            </article>
+          ))}
+        </details>
+      )}
       <fieldset>
         <legend>选择节点范围</legend>
         {preview.nodes.map((node) => (
@@ -372,7 +404,7 @@ function PreviewReview({
         />
         我已审阅以上范围，允许向所示模型发送一次；可能计费。
       </label>
-      <div className="panel-actions">
+      <div className="panel-actions" data-page-keep>
         <Button
           onClick={() => {
             sessionStorage.removeItem(consentStorage);

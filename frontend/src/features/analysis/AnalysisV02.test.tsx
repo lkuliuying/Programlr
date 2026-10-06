@@ -155,6 +155,12 @@ beforeEach(() => {
       job_id: id(5),
       created_at: time,
       source_extensions: ['.py'],
+      source_manifest_names: [],
+      preparation_status: 'pending',
+      source_scan_id: null,
+      scan_job_id: null,
+      analysis_job_id: null,
+      analysis_id: null,
       summary: {
         entries: 1,
         accepted: 1,
@@ -214,6 +220,10 @@ test('明确两侧绑定，刷新后恢复同一输入和幂等键，不自动�
     progress: null,
     snapshot_id: id(3),
     previous_job_id: null,
+    parent_job_id: null,
+    source_kind: '',
+    result_deleted_at: null,
+    result_deleted: false,
     result_url: null,
     error: null,
     created_at: time,
@@ -262,6 +272,7 @@ test('对比历史、双侧差异、旧引用和候选开关可以操作', async
   expect(await screen.findByText(`只读源码 ${id(2)}`)).toBeTruthy();
   expect(screen.getByText(`只读源码 ${id(3)}`)).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: '修改 · models.py' }));
+  expect(screen.getByRole('table', { name: '文件变化' })).toBeTruthy();
   expect(callbacks.onChange).toHaveBeenCalledWith(file.id);
   fireEvent.click(screen.getByText(`讲解 ${id(6).slice(0, 8)}`));
   fireEvent.click(screen.getByRole('button', { name: '打开旧讲解' }));

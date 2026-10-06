@@ -11,6 +11,7 @@ import type {
   SystemCheck,
 } from '../../../shared/api/generated/schema';
 import { page as decodePage } from '../../../shared/api/validation';
+import * as v from '../../../shared/api/validation';
 
 export function parseJob(value: unknown): Job {
   if (
@@ -24,6 +25,8 @@ export function parseJob(value: unknown): Job {
       'explanation',
       'lab',
       'snapshot_comparison',
+      'source_scan',
+      'delete',
     ].includes(value.kind) ||
     typeof value.status !== 'string' ||
     !['queued', 'running', 'succeeded', 'failed'].includes(value.status) ||
@@ -31,9 +34,14 @@ export function parseJob(value: unknown): Job {
     typeof value.created_at !== 'string' ||
     typeof value.updated_at !== 'string' ||
     (value.snapshot_id !== null &&
-      (!['import', 'analysis', 'explanation', 'snapshot_comparison'].includes(
-        String(value.kind),
-      ) ||
+      (![
+        'import',
+        'analysis',
+        'explanation',
+        'snapshot_comparison',
+        'source_scan',
+        'delete',
+      ].includes(String(value.kind)) ||
         typeof value.snapshot_id !== 'string')) ||
     (value.previous_job_id !== null &&
       (typeof value.previous_job_id !== 'string' ||
@@ -53,9 +61,11 @@ export function parseJob(value: unknown): Job {
                 ? /^\/api\/v1\/explanations\/[0-9a-f-]+\/$/
                 : value.kind === 'snapshot_comparison'
                   ? /^\/api\/v1\/snapshot-comparisons\/[0-9a-f-]+\/$/
-                  : value.kind === 'lab'
-                    ? /^\/api\/v1\/(?:lab-runs|system-lab-runs)\/[0-9a-f-]+\/$/
-                    : /^\/api\/v1\/system-checks\/[0-9a-f-]+\/$/
+                  : value.kind === 'source_scan'
+                    ? /^\/api\/v1\/source-scans\/[0-9a-f-]+\/$/
+                    : value.kind === 'lab'
+                      ? /^\/api\/v1\/(?:lab-runs|system-lab-runs)\/[0-9a-f-]+\/$/
+                      : /^\/api\/v1\/system-checks\/[0-9a-f-]+\/$/
         ).test(value.result_url))) ||
     (value.error !== null &&
       (!isRecord(value.error) ||
@@ -68,6 +78,7 @@ export function parseJob(value: unknown): Job {
   }
   if (
     value.kind === 'import' &&
+    value.result_deleted !== true &&
     (value.status === 'succeeded'
       ? typeof value.snapshot_id !== 'string' ||
         value.result_url !== `/api/v1/snapshots/${value.snapshot_id}/`
@@ -76,19 +87,35 @@ export function parseJob(value: unknown): Job {
     throw new ApiError('导入任务的快照归属无效。', 0);
   }
   if (
-    ['analysis', 'explanation', 'snapshot_comparison'].includes(
+    ['analysis', 'explanation', 'snapshot_comparison', 'source_scan'].includes(
       String(value.kind),
     ) &&
     (typeof value.snapshot_id !== 'string' ||
       !/^[0-9a-f-]{36}$/.test(value.snapshot_id) ||
-      (value.status === 'succeeded'
+      (value.status === 'succeeded' && value.result_deleted !== true
         ? value.result_url === null
         : value.result_url !== null))
   ) {
     throw new ApiError('分析任务的快照或结果归属无效。', 0);
   }
   if (
+    (value.kind === 'delete' && value.result_url !== null) ||
+    (value.result_deleted !== undefined &&
+      typeof value.result_deleted !== 'boolean') ||
+    (value.result_deleted === true && value.result_url !== null) ||
+    (value.source_kind !== undefined &&
+      !['zip', 'folder', '', null].includes(
+        value.source_kind as string | null,
+      )) ||
+    (value.parent_job_id !== undefined &&
+      value.parent_job_id !== null &&
+      (typeof value.parent_job_id !== 'string' ||
+        !/^[0-9a-f-]{36}$/.test(value.parent_job_id)))
+  )
+    throw new ApiError('任务来源或删除状态无效。', 0);
+  if (
     value.kind === 'lab' &&
+    value.result_deleted !== true &&
     (value.snapshot_id !== null ||
       (value.status === 'succeeded'
         ? value.result_url === null
@@ -96,7 +123,13 @@ export function parseJob(value: unknown): Job {
   )
     throw new ApiError('实验任务的来源或结果无效。', 0);
   // 运行时逐字段校验后才收窄为生成类型，禁止把未校验 JSON 直接当作 DTO。
-  return value as Job;
+  return {
+    ...value,
+    parent_job_id: v.nullable(value.parent_job_id ?? null, v.uuid),
+    source_kind: v.oneOf(value.source_kind ?? '', ['', 'zip', 'folder']),
+    result_deleted_at: v.nullable(value.result_deleted_at ?? null, v.date),
+    result_deleted: v.boolean(value.result_deleted ?? false),
+  } as Job;
 }
 
 export function parsePage(value: unknown): JobPage {

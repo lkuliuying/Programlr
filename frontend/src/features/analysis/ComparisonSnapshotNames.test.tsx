@@ -234,10 +234,10 @@ test('对比选择使用名称，跨页所选快照通过归属校验的详情�
   expect(screen.queryByText(`已选 ${selected}`)).toBeNull();
   expect(screen.queryByText(first.slice(0, 8))).toBeNull();
   const snapshotPager = within(
-    target.getAllByRole('navigation', { name: '分页' })[0],
+    target.getAllByRole('navigation', { name: '记录分页' })[0],
   );
-  fireEvent.click(snapshotPager.getByRole('button', { name: '下一页' }));
-  await target.findByText('第 2 页');
+  fireEvent.click(snapshotPager.getByRole('button', { name: '下一批记录' }));
+  await target.findByText('第 2 批');
   expect(target.getByRole('option', { name: '增加请求校验' })).toHaveProperty(
     'value',
     selected,

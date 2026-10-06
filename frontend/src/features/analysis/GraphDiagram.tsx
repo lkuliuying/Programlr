@@ -71,6 +71,7 @@ export function GraphDiagram({
   graph,
   onSource,
   onFullGraph,
+  undirected = false,
 }: {
   nodes: GraphNode[];
   edges: GraphEdge[];
@@ -81,6 +82,7 @@ export function GraphDiagram({
   graph?: Graph;
   onSource?: (reference: SourceRef) => void;
   onFullGraph?: () => void;
+  undirected?: boolean;
 }) {
   const arrow = useId().replace(/:/g, '');
   const [details, setDetails] = useState<{
@@ -102,11 +104,15 @@ export function GraphDiagram({
     inspector.current?.focus({ preventScroll: true });
   }, [item?.id, item?.kind]);
   const group = (node: GraphNode) =>
-    node.kind.startsWith('frontend')
-      ? 0
-      : node.kind === 'endpoint' || node.kind === 'view'
-        ? 1
-        : 2;
+    undirected
+      ? node.kind === 'endpoint'
+        ? 0
+        : 1
+      : node.kind.startsWith('frontend')
+        ? 0
+        : node.kind === 'endpoint' || node.kind === 'view'
+          ? 1
+          : 2;
   const buckets = [0, 1, 2].map((column) =>
     nodes.filter((node) => group(node) === column),
   );
@@ -124,11 +130,21 @@ export function GraphDiagram({
   const shownEdges = edges
     .filter((edge) => ids.has(edge.source_id) && ids.has(edge.target_id))
     .slice(0, compact ? 24 : edges.length);
-  const groups = [
-    shown.filter((node) => node.kind.startsWith('frontend')),
-    shown.filter((node) => node.kind === 'endpoint' || node.kind === 'view'),
-    shown.filter((node) => node.kind === 'serializer' || node.kind === 'model'),
-  ];
+  const groups = undirected
+    ? [
+        shown.filter((node) => node.kind === 'endpoint'),
+        shown.filter((node) => node.kind !== 'endpoint'),
+        [],
+      ]
+    : [
+        shown.filter((node) => node.kind.startsWith('frontend')),
+        shown.filter(
+          (node) => node.kind === 'endpoint' || node.kind === 'view',
+        ),
+        shown.filter(
+          (node) => node.kind === 'serializer' || node.kind === 'model',
+        ),
+      ];
   const positions = new Map(
     groups.flatMap((items, column) =>
       items.map(
@@ -143,7 +159,7 @@ export function GraphDiagram({
       ),
     ),
   );
-  const width = compact ? 592 : 1216;
+  const width = compact ? (undirected ? 398 : 592) : undirected ? 824 : 1216;
   const occupied = [new Set<number>(), new Set<number>(), new Set<number>()];
   const routes = shownEdges.map((edge) => {
     const source = positions.get(edge.source_id)!,
@@ -260,10 +276,11 @@ export function GraphDiagram({
             )}
           </div>
           <div className="graph-legend">
-            <span>→ 静态关系</span>
-            <span className="accent-text">→ 人工确认</span>
-            <span className="warning-text">⇢ 未决候选</span>
-            <span className="error-text">⇢ 人工排除</span>
+            <span>{undirected ? '↔ 源码关联' : '→ 静态关系'}</span>
+            {!undirected && <span className="warning-text">⇢ 未决候选</span>}
+            {!!reviews.length && (
+              <span className="accent-text">历史人工决定</span>
+            )}
           </div>
           {graph?.truncated && (
             <p role="alert" className="graph-truncation">
@@ -280,19 +297,20 @@ export function GraphDiagram({
           aria-label="静态关系图画布"
         >
           <div className="diagram-canvas" style={{ width, height }}>
-            {['前端 · React', '接口与视图 · DRF', '序列化器与模型'].map(
-              (label, column) => (
-                <span
-                  className="graph-group-label"
-                  style={{
-                    left: compact ? 12 + column * 194 : 24 + column * 406,
-                  }}
-                  key={label}
-                >
-                  {label}
-                </span>
-              ),
-            )}
+            {(undirected
+              ? ['接口', '共享处理器、序列化器与模型']
+              : ['前端 · React', '接口与视图 · DRF', '序列化器与模型']
+            ).map((label, column) => (
+              <span
+                className="graph-group-label"
+                style={{
+                  left: compact ? 12 + column * 194 : 24 + column * 406,
+                }}
+                key={label}
+              >
+                {label}
+              </span>
+            ))}
             <svg width={width} height={height} aria-hidden="true">
               <defs>
                 <marker
@@ -312,7 +330,7 @@ export function GraphDiagram({
                   key={edge.id}
                   className={`graph-edge edge-${decision(edge)}${currentEdge?.id === edge.id ? ' graph-edge-active' : ''}`}
                   d={path}
-                  markerEnd={`url(#${arrow})`}
+                  markerEnd={undirected ? undefined : `url(#${arrow})`}
                 >
                   <title>{decisionLabel(edge)}</title>
                 </path>
@@ -320,7 +338,7 @@ export function GraphDiagram({
             </svg>
             {!compact &&
               routes.map(({ edge, x, y }, index) => {
-                const label = `${nodes.find((node) => node.id === edge.source_id)?.name} → ${nodes.find((node) => node.id === edge.target_id)?.name} · ${relations[edge.relation]} · ${decisionLabel(edge)}`;
+                const label = `${nodes.find((node) => node.id === edge.source_id)?.name} ${undirected ? '↔' : '→'} ${nodes.find((node) => node.id === edge.target_id)?.name} · ${relations[edge.relation]} · ${decisionLabel(edge)}`;
                 return (
                   <button
                     type="button"
@@ -440,7 +458,7 @@ export function GraphDiagram({
                     nodes.find((node) => node.id === currentEdge.source_id)
                       ?.name
                   }{' '}
-                  →{' '}
+                  {undirected ? '↔' : '→'}{' '}
                   {
                     nodes.find((node) => node.id === currentEdge.target_id)
                       ?.name
@@ -452,7 +470,7 @@ export function GraphDiagram({
                 />
                 {currentEdge.relation === 'candidate_match' && (
                   <p className="muted">
-                    人工确认、排除和撤销请在候选影响模块处理。
+                    人工校准已退役。历史决定仅用于读取，未决候选保持明确标记。
                   </p>
                 )}
               </>
@@ -469,10 +487,11 @@ export function GraphDiagram({
       )}
       {compact && (
         <div className="graph-legend">
-          <span>→ 静态关系</span>
-          <span className="accent-text">→ 人工确认</span>
-          <span className="warning-text">⇢ 未决候选</span>
-          <span className="error-text">⇢ 人工排除</span>
+          <span>{undirected ? '↔ 源码关联' : '→ 静态关系'}</span>
+          {!undirected && <span className="warning-text">⇢ 未决候选</span>}
+          {!!reviews.length && (
+            <span className="accent-text">历史人工决定</span>
+          )}
         </div>
       )}
       {compact && (
@@ -481,7 +500,8 @@ export function GraphDiagram({
           <ul>
             {shownEdges.map((edge) => (
               <li key={edge.id}>
-                {nodes.find((node) => node.id === edge.source_id)?.name} →{' '}
+                {nodes.find((node) => node.id === edge.source_id)?.name}{' '}
+                {undirected ? '↔' : '→'}{' '}
                 {nodes.find((node) => node.id === edge.target_id)?.name} ·{' '}
                 {decisionLabel(edge)}
               </li>

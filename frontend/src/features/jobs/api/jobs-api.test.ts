@@ -45,6 +45,31 @@ test('拒绝未知任务状态、非同源结果和缺失字段', () => {
   ])
     expect(() => parseJob(invalid)).toThrow();
 });
+
+test('删除后历史导入、分析和实验只读取摘要，不要求已清理结果链接', () => {
+  const snapshot = '9d8df4d4-d2c7-4c58-886d-8f0084f29652';
+  for (const kind of [
+    'import',
+    'analysis',
+    'explanation',
+    'source_scan',
+    'snapshot_comparison',
+    'lab',
+  ]) {
+    const removed = {
+      ...job,
+      kind,
+      status: 'succeeded',
+      snapshot_id: kind === 'lab' ? null : snapshot,
+      result_deleted: true,
+      result_deleted_at: '2026-10-03T00:00:00Z',
+    };
+    expect(parseJob(removed).result_deleted).toBe(true);
+    expect(() =>
+      parseJob({ ...removed, result_url: `/api/v1/analyses/${snapshot}/` }),
+    ).toThrow();
+  }
+});
 test('验证空列表和分页边界', () => {
   expect(
     parsePage({ count: 0, next: null, previous: null, results: [] }).results,

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Button, Tag } from 'antd';
 import type {
+  ComparisonFile,
   ComparisonInputRequest,
   Evidence,
   Job,
@@ -10,6 +11,10 @@ import type {
 } from '../../shared/api/generated/schema';
 import { Feedback } from '../../shared/components/Feedback';
 import { PageControls } from '../../shared/components/PageControls';
+import {
+  RecordList,
+  type RecordColumn,
+} from '../../shared/components/RecordList';
 import { useIdempotentOperation } from '../../shared/hooks/useIdempotentOperation';
 import {
   getSnapshot,
@@ -484,6 +489,26 @@ function ComparisonDetails({
     relations = data.relations.filter(
       (x) => showUnchanged || x.change_type !== 'unchanged',
     );
+  const fileTitle = (file: ComparisonFile) => (
+    <button
+      type="button"
+      className="record-choice"
+      aria-label={`${changeLabels[file.change_type]} · ${file.file_path}`}
+      aria-current={changeId === file.id ? 'true' : undefined}
+      onClick={() => onChange(file.id)}
+    >
+      <code>{file.file_path}</code>
+    </button>
+  );
+  const fileColumns: RecordColumn<ComparisonFile>[] = [
+    { key: 'path', title: '文件路径', render: fileTitle },
+    {
+      key: 'change',
+      title: '变化类型',
+      width: 120,
+      render: (file) => <Tag>{changeLabels[file.change_type]}</Tag>,
+    },
+  ];
   return (
     <>
       <p>
@@ -519,19 +544,23 @@ function ComparisonDetails({
           void files.refetch();
         }}
       />
-      <ul className="workspace-nav">
-        {files.data?.results.map((x) => (
-          <li key={x.id}>
-            <button
-              type="button"
-              aria-current={changeId === x.id ? 'true' : undefined}
-              onClick={() => onChange(x.id)}
-            >
-              {changeLabels[x.change_type]} · {x.file_path}
-            </button>
-          </li>
-        ))}
-      </ul>
+      {files.isPending && <p role="status">读取文件变化…</p>}
+      {files.data && (
+        <RecordList
+          label="文件变化"
+          records={files.data.results}
+          columns={fileColumns}
+          rowKey={(file) => file.id}
+          recordTitle={fileTitle}
+          titleColumnKey="path"
+          selectedKey={changeId ?? undefined}
+          empty={
+            files.data.count
+              ? '当前批次没有文件变化记录，请查看其他批次。'
+              : '当前对比没有文件变化记录。'
+          }
+        />
+      )}
       {files.data && (
         <PageControls page={page} {...files.data} onPage={setPage} />
       )}

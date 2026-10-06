@@ -39,7 +39,7 @@ const preview: ContextPreview = {
   endpoint_index: 0,
   payload_digest: 'a'.repeat(64),
   created_at: '2026-09-29T00:00:00Z',
-  template_version: '1',
+  template_version: '1.1.0',
   configuration: {
     base_url: 'https://model-test.invalid/v1',
     model: 'test-model',
@@ -269,7 +269,7 @@ test.each([
       analysis_id: id,
       snapshot_id: id,
       endpoint_index: 0,
-      template_version: '1',
+      template_version: '1.1.0',
       model: 'test-model',
       created_at: preview.created_at,
       usage,
@@ -307,6 +307,10 @@ test('历史超限任务仍显示原失败且不自动重发', async () => {
     stage: 'failed',
     progress: null,
     previous_job_id: null,
+    parent_job_id: null,
+    source_kind: '',
+    result_deleted_at: null,
+    result_deleted: false,
     result_url: null,
     error: {
       code: 'MODEL_OUTPUT_BUDGET_EXCEEDED',

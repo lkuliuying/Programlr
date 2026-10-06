@@ -12,17 +12,17 @@ export function PageControls({
   onPage: (page: number) => void;
 }) {
   return (
-    <nav className="workspace-pagination" aria-label="分页">
+    <nav className="workspace-pagination" aria-label="记录分页">
       <Button
         size="small"
         disabled={!previous}
         onClick={() => onPage(page - 1)}
       >
-        上一页
+        上一批记录
       </Button>
-      <span>第 {page} 页</span>
+      <span>第 {page} 批</span>
       <Button size="small" disabled={!next} onClick={() => onPage(page + 1)}>
-        下一页
+        下一批记录
       </Button>
     </nav>
   );

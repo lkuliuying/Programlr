@@ -30,6 +30,12 @@ const snapshot: Snapshot = {
   name: '',
   created_at: '2026-10-01T00:00:00Z',
   source_extensions: ['.py'],
+  source_manifest_names: [],
+  preparation_status: 'pending',
+  source_scan_id: null,
+  scan_job_id: null,
+  analysis_job_id: null,
+  analysis_id: null,
   summary: {
     entries: 9,
     accepted: 9,

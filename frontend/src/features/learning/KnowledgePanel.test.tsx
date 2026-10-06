@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import {
   cleanup,
+  act,
   fireEvent,
   render,
   screen,
   waitFor,
+  within,
 } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type {
@@ -105,7 +107,156 @@ beforeEach(() => {
   vi.mocked(paths.getCurriculum).mockResolvedValue(curriculum);
   vi.mocked(paths.getPath).mockResolvedValue(path);
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
+
+function focusFrames() {
+  let sequence = 0;
+  const callbacks = new Map<number, FrameRequestCallback>();
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    const id = ++sequence;
+    callbacks.set(id, callback);
+    return id;
+  });
+  vi.stubGlobal('cancelAnimationFrame', (id: number) => callbacks.delete(id));
+  return {
+    callbacks,
+    advance() {
+      const pending = [...callbacks.values()];
+      callbacks.clear();
+      act(() => {
+        for (const callback of pending) callback(performance.now());
+      });
+    },
+  };
+}
+
+test('知识目录切换只展示对应完整正文，不触发作答或自评写入', async () => {
+  const second = {
+    ...card,
+    id: '00000000-0000-0000-0000-000000000002',
+    title: '幂等恢复',
+    body: '结果未知时保留同一个操作标识。',
+  };
+  vi.mocked(api.getCards).mockResolvedValue({
+    ...empty,
+    count: 2,
+    results: [card, second],
+  });
+  panel();
+  await screen.findByText(card.body);
+  fireEvent.click(
+    within(screen.getByRole('navigation', { name: '知识目录' })).getByRole(
+      'button',
+      { name: /幂等恢复/ },
+    ),
+  );
+  expect(
+    screen.getByRole('article', { name: '知识正文' }).textContent,
+  ).toContain(second.body);
+  expect(screen.queryByText(card.body)).toBeNull();
+  fireEvent.click(
+    within(screen.getByRole('navigation', { name: '知识目录' })).getByRole(
+      'button',
+      { name: /请求边界/ },
+    ),
+  );
+  expect(screen.getByText(card.body)).toBeTruthy();
+  expect(api.getCards).toHaveBeenCalledTimes(1);
+  expect(api.submitAttempt).not.toHaveBeenCalled();
+  expect(paths.submitReview).not.toHaveBeenCalled();
+});
+
+test('初始读取不抢焦点，用户选卡等待正文测量后聚焦，同卡再选仍可定位', async () => {
+  const frames = focusFrames();
+  panel();
+  const article = await screen.findByRole('article', { name: '知识正文' });
+  const reading = screen.getByRole('region', { name: '知识正文区域' });
+  expect(document.activeElement).not.toBe(reading);
+  expect(frames.callbacks.size).toBe(0);
+  const choice = within(
+    screen.getByRole('navigation', { name: '知识目录' }),
+  ).getByRole('button', { name: /请求边界/ });
+  choice.focus();
+  fireEvent.click(choice);
+  frames.advance();
+  expect(document.activeElement).toBe(choice);
+  frames.advance();
+  expect(document.activeElement).toBe(reading);
+  expect(article.textContent).toContain(card.body);
+  choice.focus();
+  fireEvent.click(choice);
+  frames.advance();
+  frames.advance();
+  expect(document.activeElement).toBe(reading);
+  expect(api.getCards).toHaveBeenCalledTimes(1);
+  expect(api.submitAttempt).not.toHaveBeenCalled();
+  expect(paths.submitReview).not.toHaveBeenCalled();
+});
+
+test('切换卡片只聚焦最后正文，换批次或隐藏模块不会迟到抢焦点', async () => {
+  const frames = focusFrames();
+  const second = {
+    ...card,
+    id: '00000000-0000-0000-0000-000000000002',
+    title: '幂等恢复',
+    body: '未知结果保留原标识。',
+  };
+  vi.mocked(api.getCards)
+    .mockResolvedValueOnce({
+      ...empty,
+      count: 3,
+      next: '/api/v1/knowledge-cards/?page=2',
+      results: [card, second],
+    })
+    .mockResolvedValueOnce({ ...empty, count: 1, results: [card] });
+  const view = panel();
+  await screen.findByText(card.body);
+  const directory = within(
+    screen.getByRole('navigation', { name: '知识目录' }),
+  );
+  fireEvent.click(directory.getByRole('button', { name: /请求边界/ }));
+  fireEvent.click(directory.getByRole('button', { name: /幂等恢复/ }));
+  frames.advance();
+  frames.advance();
+  expect(document.activeElement).toBe(
+    screen.getByRole('region', { name: '知识正文区域' }),
+  );
+  expect(
+    screen.getByRole('article', { name: '知识正文' }).textContent,
+  ).toContain(second.body);
+  fireEvent.click(directory.getByRole('button', { name: /幂等恢复/ }));
+  frames.advance();
+  const next = screen.getByRole('button', { name: '下一批记录' });
+  next.focus();
+  fireEvent.click(next);
+  await screen.findByText(card.body);
+  frames.advance();
+  frames.advance();
+  expect(document.activeElement).not.toBe(
+    screen.getByRole('region', { name: '知识正文区域' }),
+  );
+  expect(frames.callbacks.size).toBe(0);
+  const currentChoice = within(
+    screen.getByRole('navigation', { name: '知识目录' }),
+  ).getByRole('button', { name: /请求边界/ });
+  currentChoice.focus();
+  fireEvent.click(currentChoice);
+  const region = screen.getByRole('region', { name: '知识与学习' });
+  region.setAttribute('hidden', '');
+  frames.advance();
+  frames.advance();
+  expect(document.activeElement).toBe(currentChoice);
+  expect(api.submitAttempt).not.toHaveBeenCalled();
+  expect(paths.submitReview).not.toHaveBeenCalled();
+  region.removeAttribute('hidden');
+  fireEvent.click(currentChoice);
+  expect(frames.callbacks.size).toBe(1);
+  view.unmount();
+  expect(frames.callbacks.size).toBe(0);
+});
 
 test('未选择接口仍可阅读全局卡片，学习路径提供独立引导', async () => {
   panel();
@@ -153,7 +304,7 @@ test('知识卡片分页读取所选页，空内容和读取失败明确呈现',
     .mockResolvedValueOnce(empty);
   panel();
   await screen.findByText('请求边界 · v1');
-  fireEvent.click(screen.getByRole('button', { name: '下一页' }));
+  fireEvent.click(screen.getByRole('button', { name: '下一批记录' }));
   await screen.findByText('暂无已发布知识卡片。');
   await waitFor(() =>
     expect(api.getCards).toHaveBeenLastCalledWith(2, expect.any(AbortSignal)),

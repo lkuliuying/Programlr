@@ -131,6 +131,15 @@ export const getCards = (page: number, signal: AbortSignal) =>
     (raw) => v.page(raw, '/api/v1/knowledge-cards/', parseCard),
     { signal },
   );
+export const getCard = (id: string, signal: AbortSignal) =>
+  requestJson(
+    `/api/v1/knowledge-cards/${v.uuid(id)}/`,
+    (raw) => {
+      const card = parseCard(raw);
+      return card.id === id ? card : v.invalid();
+    },
+    { signal },
+  );
 export const getExercises = (
   selected: LearningSelection,
   page: number,

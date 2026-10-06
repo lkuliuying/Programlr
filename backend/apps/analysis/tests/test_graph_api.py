@@ -193,13 +193,20 @@ def test_additive_migration_preserves_legacy_analysis_without_backfill() -> None
         executor.migrate([("analysis", "0001_initial")])
         executor = MigrationExecutor(connection)
         executor.migrate([("analysis", "0003_analysis_frontend")])
-        assert Analysis.objects.values().get(pk=identity) == {
-            **before,
+        historical = executor.loader.project_state(
+            [("analysis", "0003_analysis_frontend")]
+        ).apps
+        legacy_analysis = historical.get_model("analysis", "Analysis")
+        legacy_graph = historical.get_model("analysis", "AnalysisGraph")
+        fields = {field.attname for field in legacy_analysis._meta.concrete_fields}
+        assert legacy_analysis.objects.values().get(pk=identity) == {
+            **{key: value for key, value in before.items() if key in fields},
             "frontend": None,
         }
-        assert not AnalysisGraph.objects.exists()
-        response = client_with_token().get(GRAPH_PATH.format(analysis_id=identity))
-        assert response.status_code == 409
+        assert not legacy_graph.objects.exists()
     finally:
         # 回退分析迁移会同时卸载依赖模块，结束时必须恢复原有完整迁移图。
         MigrationExecutor(connection).migrate(restore_targets)
+    # 当前运行模型只访问恢复后的 schema，不能在旧迁移阶段查询新增字段。
+    response = client_with_token().get(GRAPH_PATH.format(analysis_id=identity))
+    assert response.status_code == 409

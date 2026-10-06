@@ -8,6 +8,11 @@ from apps.analysis.api.comparison_views import (
 )
 from apps.analysis.api.impact_views import AnalysisImpactView, ComparisonImpactView
 from apps.analysis.api.review_views import RelationReviewsView
+from apps.analysis.api.scan_views import (
+    EndpointRelationsView,
+    SourceScanDetailView,
+    SourceScansView,
+)
 from apps.analysis.api.views import (
     AnalysesView,
     AnalysisDetailView,
@@ -17,6 +22,12 @@ from apps.analysis.api.views import (
 )
 
 urlpatterns = [
+    path("snapshots/<uuid:snapshot_id>/source-scans/", SourceScansView.as_view()),
+    path("source-scans/<uuid:scan_id>/", SourceScanDetailView.as_view()),
+    path(
+        "analyses/<uuid:analysis_id>/endpoint-relations/",
+        EndpointRelationsView.as_view(),
+    ),
     path("analyses/<uuid:analysis_id>/impact/", AnalysisImpactView.as_view()),
     path(
         "snapshot-comparisons/<uuid:comparison_id>/impact/",

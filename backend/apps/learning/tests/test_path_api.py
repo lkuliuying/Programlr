@@ -8,11 +8,13 @@ import pytest
 from apps.analysis.models import Analysis
 from apps.jobs.tests.test_contract import assert_response, contract_schema
 from apps.jobs.tests.test_jobs import client_with_token
-from apps.learning.content import CONTENT_ROOT, load_content
+from apps.learning.content import CONTENT_ROOT, load_cards_only
 from apps.learning.models import Exercise, KnowledgeCard, KnowledgeCurriculum
+from apps.learning.paths.publication import load_curricula, validate_definition
 from apps.learning.tests.test_learning import analysis as analysis
 from apps.learning.tests.test_learning import values
 from apps.projects.models import SourceFile
+from common.errors import ApiProblem
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -59,7 +61,7 @@ def test_published_curriculum_path_and_no_get_writes(analysis: Analysis) -> None
     result = client.get("/api/v1/learning-paths/?" + query).json()
     assert not result["applicable"] and result["order"] == [] and result["steps"] == []
     assert (
-        KnowledgeCurriculum.objects.count() == 1 and KnowledgeCard.objects.count() == 8
+        KnowledgeCurriculum.objects.count() == 1 and KnowledgeCard.objects.count() == 29
     )
     assert client.get("/api/v1/learning-paths/").status_code == 400
     assert client.get(f"/api/v1/knowledge-curricula/{uuid.uuid4()}/").status_code == 404
@@ -86,15 +88,20 @@ def test_publication_drift_unknown_card_cycle_and_atomic_rollback(
         cards = json.loads(cards_path.read_text(encoding="utf-8"))
         cards[0]["version"] = "2.0.0"
         cards_path.write_text(json.dumps(cards), encoding="utf-8")
-        with pytest.raises(ValueError):
-            load_content(copied)
+        with pytest.raises(ApiProblem) as retired:
+            load_curricula(copied)
+        assert retired.value.machine_code == "FEATURE_RETIRED"
+        if change != "drift":
+            with pytest.raises(ValueError):
+                validate_definition(value)
+        else:
+            assert KnowledgeCurriculum.objects.get().title != value["title"]
         assert KnowledgeCurriculum.objects.count() == 1
         assert not KnowledgeCard.objects.filter(version="2.0.0").exists()
         shutil.copyfile(CONTENT_ROOT / "knowledge/learning-systems.json", cards_path)
     original["version"] = "1.1.0"
     path.write_text(json.dumps(original), encoding="utf-8")
-    load_content(copied)
+    load_cards_only(copied)
     assert set(KnowledgeCurriculum.objects.values_list("version", flat=True)) == {
-        "1.0.0",
-        "1.1.0",
+        "1.0.0"
     }

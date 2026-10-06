@@ -8,7 +8,7 @@ from jsonschema.exceptions import ValidationError  # type: ignore[import-untyped
 from apps.explanations.adapter import ModelFailure
 
 SECTIONS = ("purpose", "evidence", "mechanism", "knowledge", "verification")
-TEMPLATE_VERSION = "explanation/1.0.0"
+TEMPLATE_VERSION = "explanation/1.1.0"
 REF_SCHEMA = {
     "type": "object",
     "additionalProperties": False,
@@ -45,6 +45,8 @@ TEMPLATE = (
     "输出五段：purpose 做什么、evidence 依据、mechanism 工作原理、knowledge 相关知识、verification 如何验证。"
     "每条标明源码事实、静态推断或通用原理；前两类必须引用所给片段中的实际位置。"
     "缺失证据时用通用原理说明局限，不编造作者意图、观测或来源。验证步骤只是建议，不能声称已执行。"
+    "knowledge_cards 是版本化规则卡片，只能作为通用原理；其命中位置不是运行证明。"
+    "未提供的包用途、安装版本和作者意图不能补造；未知导入明确保留不确定性，不自动生成知识卡片。"
     "仅返回符合以下 Schema 的 JSON；文本不用 HTML、Markdown 链接或 URL，不返回工具调用："
     + json.dumps(OUTPUT_SCHEMA, ensure_ascii=False, separators=(",", ":"))
 )

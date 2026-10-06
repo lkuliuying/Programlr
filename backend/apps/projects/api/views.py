@@ -30,10 +30,13 @@ from apps.projects.services import (
     source_content,
     submit_import,
 )
-from common.api import operation_key, page_response, query_numbers
+from common.api import operation_key, page_response, query_numbers, text_query
 from common.errors import ApiProblem
+from common.resource_state import require_project_available, require_snapshot_available
 
-ERRORS = {status: ErrorSerializer for status in (400, 403, 404, 409, 413, 415, 503)}
+ERRORS = {
+    status: ErrorSerializer for status in (400, 403, 404, 409, 410, 413, 415, 503)
+}
 WRITE_HEADERS = [
     OpenApiParameter(name, str, OpenApiParameter.HEADER, required=True)
     for name in ("Idempotency-Key", "X-CSRFToken", "Origin")
@@ -46,11 +49,18 @@ class ProjectsView(APIView):
 
     @extend_schema(
         operation_id="projects_list",
-        parameters=PAGES,
+        parameters=[
+            *PAGES,
+            OpenApiParameter("q", {"type": "string", "maxLength": 200}),
+        ],
         responses={200: ProjectPageSerializer, **ERRORS},
     )
     def get(self, request: Request) -> Response:
-        return page_response(request, Project.objects.all(), ProjectSerializer)
+        filters = text_query(request)
+        projects = Project.objects.filter(deletion_request_id__isnull=True)
+        if filters.get("q"):
+            projects = projects.filter(name__icontains=filters["q"])
+        return page_response(request, projects, ProjectSerializer, filters=filters)
 
     @extend_schema(
         operation_id="projects_create",
@@ -76,9 +86,25 @@ class ProjectDetailView(APIView):
         operation_id="projects_retrieve", responses={200: ProjectSerializer, **ERRORS}
     )
     def get(self, request: Request, project_id: uuid.UUID) -> Response:
-        return Response(
-            ProjectSerializer(get_object_or_404(Project, pk=project_id)).data
-        )
+        project = get_object_or_404(Project, pk=project_id)
+        require_project_available(project)
+        return Response(ProjectSerializer(project).data)
+
+    @extend_schema(
+        operation_id="projects_delete",
+        parameters=WRITE_HEADERS,
+        request={
+            "type": "object",
+            "required": ["confirmation_digest"],
+            "properties": {"confirmation_digest": {"type": "string"}},
+            "additionalProperties": False,
+        },
+        responses={200: JobSerializer, 202: JobSerializer, **ERRORS},
+    )
+    def delete(self, request: Request, project_id: uuid.UUID) -> Response:
+        from apps.jobs.cleanup_api import delete_target
+
+        return delete_target(request, "project", project_id)
 
 
 class ImportsView(APIView):
@@ -98,6 +124,7 @@ class ImportsView(APIView):
     )
     def post(self, request: Request, project_id: uuid.UUID) -> Response:
         project = get_object_or_404(Project, pk=project_id)
+        require_project_available(project)
         key = operation_key(request)
         if request.content_type.split(";")[0] != "multipart/form-data":
             raise UnsupportedMediaType(request.content_type)
@@ -152,9 +179,13 @@ class SnapshotsView(APIView):
         responses={200: SnapshotPageSerializer, **ERRORS},
     )
     def get(self, request: Request, project_id: uuid.UUID) -> Response:
-        get_object_or_404(Project, pk=project_id)
+        require_project_available(get_object_or_404(Project, pk=project_id))
         return page_response(
-            request, Snapshot.objects.filter(project_id=project_id), SnapshotSerializer
+            request,
+            Snapshot.objects.filter(
+                project_id=project_id, deletion_request_id__isnull=True
+            ),
+            SnapshotSerializer,
         )
 
 
@@ -165,9 +196,27 @@ class SnapshotDetailView(APIView):
         operation_id="snapshots_retrieve", responses={200: SnapshotSerializer, **ERRORS}
     )
     def get(self, request: Request, snapshot_id: uuid.UUID) -> Response:
-        return Response(
-            SnapshotSerializer(get_object_or_404(Snapshot, pk=snapshot_id)).data
+        snapshot = get_object_or_404(
+            Snapshot.objects.select_related("project"), pk=snapshot_id
         )
+        require_snapshot_available(snapshot)
+        return Response(SnapshotSerializer(snapshot).data)
+
+    @extend_schema(
+        operation_id="snapshots_delete",
+        parameters=WRITE_HEADERS,
+        request={
+            "type": "object",
+            "required": ["confirmation_digest"],
+            "properties": {"confirmation_digest": {"type": "string"}},
+            "additionalProperties": False,
+        },
+        responses={200: JobSerializer, 202: JobSerializer, **ERRORS},
+    )
+    def delete(self, request: Request, snapshot_id: uuid.UUID) -> Response:
+        from apps.jobs.cleanup_api import delete_target
+
+        return delete_target(request, "snapshot", snapshot_id)
 
     @extend_schema(
         operation_id="snapshots_rename",
@@ -197,7 +246,11 @@ class SourceFilesView(APIView):
         responses={200: SourceFilePageSerializer, **ERRORS},
     )
     def get(self, request: Request, snapshot_id: uuid.UUID) -> Response:
-        get_object_or_404(Snapshot, pk=snapshot_id)
+        require_snapshot_available(
+            get_object_or_404(
+                Snapshot.objects.select_related("project"), pk=snapshot_id
+            )
+        )
         return page_response(
             request,
             SourceFile.objects.filter(snapshot_id=snapshot_id),

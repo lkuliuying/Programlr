@@ -45,6 +45,8 @@ class SystemCheckSerializer(serializers.ModelSerializer[SystemCheck]):
 class JobSerializer(serializers.ModelSerializer[Job]):
     snapshot_id = serializers.SerializerMethodField()
     previous_job_id = serializers.SerializerMethodField()
+    parent_job_id = serializers.UUIDField(read_only=True, allow_null=True)
+    result_deleted = serializers.SerializerMethodField()
     progress = serializers.SerializerMethodField()
     result_url = serializers.SerializerMethodField()
     error = ErrorSerializer(allow_null=True)
@@ -59,6 +61,8 @@ class JobSerializer(serializers.ModelSerializer[Job]):
         return None
 
     def get_result_url(self, obj: Job) -> str | None:
+        if obj.result_deleted_at is not None:
+            return None
         if obj.status == Job.Status.SUCCEEDED:
             if obj.kind in {
                 "import",
@@ -66,10 +70,15 @@ class JobSerializer(serializers.ModelSerializer[Job]):
                 "explanation",
                 "lab",
                 "snapshot_comparison",
+                "source_scan",
+                "delete",
             }:
                 return obj.result_url
             return f"/api/v1/system-checks/{obj.check_result.pk}/"
         return None
+
+    def get_result_deleted(self, obj: Job) -> bool:
+        return obj.result_deleted_at is not None
 
     class Meta:
         model = Job
@@ -81,6 +90,10 @@ class JobSerializer(serializers.ModelSerializer[Job]):
             "stage",
             "progress",
             "previous_job_id",
+            "parent_job_id",
+            "source_kind",
+            "result_deleted_at",
+            "result_deleted",
             "result_url",
             "error",
             "created_at",

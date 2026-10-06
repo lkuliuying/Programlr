@@ -103,3 +103,17 @@ class AttemptReview(models.Model):
 
     class Meta:
         ordering = ["-created_at", "-id"]
+
+
+class CurriculumCardProgress(models.Model):
+    curriculum = models.ForeignKey(KnowledgeCurriculum, on_delete=models.CASCADE)
+    card = models.ForeignKey(KnowledgeCard, on_delete=models.PROTECT)
+    completed = models.BooleanField(default=False)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["curriculum", "card"], name="curriculum_card_progress_unique"
+            )
+        ]

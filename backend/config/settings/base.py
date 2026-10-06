@@ -9,6 +9,7 @@ INSTALLED_APPS = [
     "apps.labs",
 ]
 MIDDLEWARE = [
+    "apps.jobs.audit_middleware.OperationLogMiddleware",
     "apps.projects.uploads.ImportUploadMiddleware",
     "common.middleware.LocalBoundaryMiddleware",
     "django.middleware.security.SecurityMiddleware",
@@ -27,7 +28,7 @@ CSRF_COOKIE_HTTPONLY = True
 CSRF_COOKIE_SECURE = False
 CSRF_FAILURE_VIEW = "common.middleware.csrf_failure"
 DATA_UPLOAD_MAX_MEMORY_SIZE = 4096
-DATA_UPLOAD_MAX_NUMBER_FILES = 1
+DATA_UPLOAD_MAX_NUMBER_FILES = 2001
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 5
 IMPORT_STORAGE_ROOT = "/var/lib/learning-lab/imports"
 IMPORT_LIMITS = {
@@ -86,6 +87,8 @@ CELERY_TASK_ANNOTATIONS = {
         "jobs.system_check",
         "projects.import",
         "analysis.parse",
+        "analysis.source_scan",
+        "jobs.delete",
         "analysis.compare",
         "labs.run",
         "labs.system_run",

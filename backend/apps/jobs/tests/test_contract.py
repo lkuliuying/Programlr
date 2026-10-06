@@ -32,8 +32,29 @@ def test_implemented_contract_only() -> None:
     assert schema is not None
     paths = schema["paths"]
     assert set(paths) == {
+        "/api/v1/projects/management/",
+        "/api/v1/projects/activity/",
+        "/api/v1/snapshots/",
+        "/api/v1/snapshots/{snapshot_id}/files/{file_id}/evidence/",
+        "/api/v1/operation-logs/statistics/",
+        "/api/v1/operation-logs/export/",
+        "/api/v1/operation-logs/{log_id}/related/",
+        "/api/v1/operation-logs/{log_id}/history/",
+        "/api/v1/operation-logs/",
+        "/api/v1/operation-logs/{log_id}/",
+        "/api/v1/projects/{project_id}/deletion-preview/",
+        "/api/v1/snapshots/{snapshot_id}/deletion-preview/",
+        "/api/v1/projects/{project_id}/folder-imports/",
+        "/api/v1/jobs/{job_id}/folder-retries/",
+        "/api/v1/snapshots/{snapshot_id}/source-scans/",
+        "/api/v1/source-scans/{scan_id}/",
+        "/api/v1/analyses/{analysis_id}/endpoint-relations/",
+        "/api/v1/snapshots/{snapshot_id}/knowledge-cards/",
+        "/api/v1/snapshots/{snapshot_id}/knowledge-hits/",
         "/api/v1/knowledge-curricula/",
         "/api/v1/knowledge-curricula/{curriculum_id}/",
+        "/api/v1/knowledge-curricula/{curriculum_id}/progress/",
+        "/api/v1/knowledge-curricula/{curriculum_id}/progress/{card_id}/",
         "/api/v1/learning-paths/",
         "/api/v1/attempt-reviews/",
         "/api/v1/system-labs/",
@@ -48,6 +69,9 @@ def test_implemented_contract_only() -> None:
         "/api/v1/lab-runs/{run_id}/",
         "/api/v1/csrf/",
         "/api/v1/jobs/",
+        "/api/v1/notifications/",
+        "/api/v1/notifications/{job_id}/",
+        "/api/v1/notification-read-state/",
         "/api/v1/jobs/{job_id}/",
         "/api/v1/jobs/{job_id}/retries/",
         "/api/v1/system-checks/",
@@ -88,8 +112,8 @@ def test_implemented_contract_only() -> None:
     assert creation["requestBody"]["required"]
     body = creation["requestBody"]["content"]["application/json"]["schema"]
     assert body == {"type": "object", "additionalProperties": False}
-    assert "202" in creation["responses"]
-    assert "Location" in creation["responses"]["202"]["headers"]
+    assert creation["deprecated"] and "410" in creation["responses"]
+    assert "202" not in creation["responses"]
     fields = schema["components"]["schemas"]["Job"]["properties"]
     assert fields["snapshot_id"]["nullable"]
     assert fields["progress"]["nullable"]
@@ -156,6 +180,17 @@ def test_public_contract_metadata() -> None:
                     "no-store"
                 ]
     assert len(ids) == len(set(ids))
+    assert len(ids) == 83
+    assert {
+        "projects_management_list",
+        "projects_activity_retrieve",
+        "snapshots_search",
+        "snapshot_file_evidence_list",
+        "operation_logs_statistics",
+        "operation_logs_export",
+        "operation_logs_related",
+        "operation_logs_history",
+    } <= set(ids)
     parameters = {p["name"]: p for p in schema["paths"][LIST_PATH]["get"]["parameters"]}
     assert parameters["page"]["schema"] == {
         "type": "integer",
@@ -227,8 +262,10 @@ def test_error_boundary(
     elif status == 406:
         response = client.get(LIST_PATH, HTTP_ACCEPT="text/html")
     else:
-        response = client.post(POST_PATH, "x" * 5000, content_type="application/json")
-        schema_path, method = POST_PATH, "post"
+        response = client.post(
+            "/api/v1/projects/", "x" * 5000, content_type="application/json"
+        )
+        schema_path, method = "/api/v1/projects/", "post"
     assert response.status_code == status
     assert response.json()["code"] == code
     assert_response(response, schema, schema_path, method)

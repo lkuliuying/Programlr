@@ -8,7 +8,6 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.analysis.models import Analysis
-from apps.jobs.api.serializers import JobSerializer
 from apps.labs.api.system_serializers import (
     SystemLabInputSerializer,
     SystemLabPageSerializer,
@@ -19,9 +18,9 @@ from apps.labs.api.system_serializers import (
 from apps.labs.api.views import ERRORS, PAGES, WORKSPACE
 from apps.labs.models import SystemLabRun
 from apps.labs.system_definition import LAB_IDS, system_definition
-from apps.labs.system_services import submit_system_run
-from common.api import json_input, operation_key, page_response, resource_filters
-from common.errors import error_body
+from common.api import page_response, resource_filters
+from common.resource_state import require_snapshot_available
+from common.retirement import retired_feature
 
 
 class SystemLabsView(APIView):
@@ -35,6 +34,7 @@ class SystemLabsView(APIView):
         if set(filters) != {"analysis_id", "endpoint_index"}:
             raise ValidationError({"query": ["必须指定分析与接口。"]})
         analysis = get_object_or_404(Analysis, pk=filters["analysis_id"])
+        require_snapshot_available(analysis.snapshot)
         definitions = [
             system_definition(lab, analysis, int(filters["endpoint_index"]))
             for lab in LAB_IDS
@@ -55,6 +55,7 @@ class SystemLabDetailView(APIView):
         ) != set(filters):
             raise ValidationError({"query": ["必须且只能指定分析与接口。"]})
         analysis = get_object_or_404(Analysis, pk=filters["analysis_id"])
+        require_snapshot_available(analysis.snapshot)
         return Response(
             SystemLabSerializer(
                 system_definition(lab_id, analysis, int(filters["endpoint_index"]))
@@ -65,35 +66,16 @@ class SystemLabDetailView(APIView):
 class SubmitSystemRunView(APIView):
     @extend_schema(
         operation_id="system_lab_runs_create",
+        deprecated=True,
         request=SystemLabInputSerializer,
         parameters=[
             OpenApiParameter(name, str, OpenApiParameter.HEADER, required=True)
             for name in ("Idempotency-Key", "X-CSRFToken", "Origin")
         ],
-        responses={200: JobSerializer, 202: JobSerializer, **ERRORS},
+        responses=ERRORS,
     )
     def post(self, request: Request, lab_id: str) -> Response:
-        values = json_input(request, SystemLabInputSerializer).validated_data
-        job, created, published = submit_system_run(
-            lab_id, operation_key(request), values
-        )
-        location = f"/api/v1/jobs/{job.pk}/"
-        if not published:
-            return Response(
-                error_body(
-                    "SERVICE_UNAVAILABLE",
-                    "实验投递未确认，请查询已保存任务。",
-                    getattr(request, "request_id"),
-                    {"job_url": location},
-                ),
-                status=503,
-                headers={"Location": location},
-            )
-        return Response(
-            JobSerializer(job).data,
-            status=202 if created else 200,
-            headers={"Location": location},
-        )
+        retired_feature("lab")
 
 
 class SystemRunsView(APIView):
@@ -111,7 +93,11 @@ class SystemRunsView(APIView):
         filters = resource_filters(request, ("analysis_id", "endpoint_index", "job_id"))
         return page_response(
             request,
-            SystemLabRun.objects.select_related("job", "analysis").filter(**filters),
+            SystemLabRun.objects.select_related("job", "analysis").filter(
+                analysis__snapshot__deletion_request_id__isnull=True,
+                analysis__snapshot__project__deletion_request_id__isnull=True,
+                **filters,
+            ),
             SystemLabRunSerializer,
             filters=filters,
         )
@@ -126,6 +112,8 @@ class SystemRunDetailView(APIView):
         if request.query_params:
             raise ValidationError({"query": ["不支持此查询参数。"]})
         run = get_object_or_404(
-            SystemLabRun.objects.select_related("job", "analysis"), pk=run_id
+            SystemLabRun.objects.select_related("job", "analysis__snapshot__project"),
+            pk=run_id,
         )
+        require_snapshot_available(run.analysis.snapshot)
         return Response(SystemLabRunSerializer(run).data)

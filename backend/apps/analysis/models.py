@@ -7,6 +7,7 @@ class AnalysisRequest(models.Model):
     job = models.OneToOneField("jobs.Job", on_delete=models.PROTECT, primary_key=True)
     snapshot = models.ForeignKey("projects.Snapshot", on_delete=models.PROTECT)
     root_urlconf = models.CharField(max_length=1024)
+    source_scan = models.ForeignKey("SourceScan", null=True, on_delete=models.PROTECT)
 
 
 class Analysis(models.Model):
@@ -20,6 +21,48 @@ class Analysis(models.Model):
     diagnostics = models.JSONField()
     frontend = models.JSONField(null=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    source_scan = models.ForeignKey("SourceScan", null=True, on_delete=models.PROTECT)
+
+
+class SourceScanRequest(models.Model):
+    job = models.OneToOneField("jobs.Job", on_delete=models.PROTECT, primary_key=True)
+    snapshot = models.ForeignKey("projects.Snapshot", on_delete=models.PROTECT)
+
+
+class SourceScan(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    job = models.OneToOneField("jobs.Job", on_delete=models.PROTECT)
+    snapshot = models.ForeignKey("projects.Snapshot", on_delete=models.PROTECT)
+    rule_version = models.CharField(max_length=80)
+    result = models.JSONField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+
+
+class SnapshotPreparation(models.Model):
+    snapshot = models.OneToOneField(
+        "projects.Snapshot",
+        on_delete=models.PROTECT,
+        primary_key=True,
+        related_name="preparation",
+    )
+    status = models.CharField(max_length=20, default="pending")
+    scan_job = models.ForeignKey(
+        "jobs.Job",
+        null=True,
+        on_delete=models.PROTECT,
+        related_name="scan_preparations",
+    )
+    source_scan = models.ForeignKey(SourceScan, null=True, on_delete=models.PROTECT)
+    analysis_job = models.ForeignKey(
+        "jobs.Job",
+        null=True,
+        on_delete=models.PROTECT,
+        related_name="analysis_preparations",
+    )
+    analysis = models.ForeignKey(Analysis, null=True, on_delete=models.PROTECT)
 
 
 class AnalysisGraph(models.Model):

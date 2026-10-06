@@ -14,7 +14,6 @@ from rest_framework.views import APIView
 from apps.jobs.api.schema import SystemCheckSchema
 from apps.jobs.api.serializers import (
     CsrfSerializer,
-    EmptyCheckSerializer,
     ErrorSerializer,
     JobPageSerializer,
     JobSerializer,
@@ -22,16 +21,18 @@ from apps.jobs.api.serializers import (
 )
 from apps.jobs.models import Job, SystemCheck
 from apps.jobs.retries import submit_retry
-from apps.jobs.services import submit_check
+from apps.jobs.services import require_retryable
 from apps.projects.api.serializers import ImportInputSerializer
 from apps.projects.exceptions import ImportRejected
 from common.api import operation_key
 from common.errors import ApiProblem, error_body
+from common.retirement import retired_feature
 
 ERRORS = {
     400: ErrorSerializer,
     403: ErrorSerializer,
     404: ErrorSerializer,
+    410: ErrorSerializer,
     503: ErrorSerializer,
 }
 
@@ -50,6 +51,7 @@ class SystemChecksView(APIView):
 
     @extend_schema(
         operation_id="system_checks_create",
+        deprecated=True,
         request={"application/json": {"type": "object", "additionalProperties": False}},
         parameters=[
             OpenApiParameter(
@@ -64,8 +66,6 @@ class SystemChecksView(APIView):
             ),
         ],
         responses={
-            200: JobSerializer,
-            202: JobSerializer,
             409: ErrorSerializer,
             415: ErrorSerializer,
             413: ErrorSerializer,
@@ -73,36 +73,7 @@ class SystemChecksView(APIView):
         },
     )
     def post(self, request: Request) -> Response:
-        if request.content_type != "application/json":
-            raise UnsupportedMediaType(request.content_type)
-        if not request.body.strip():
-            raise ValidationError({"body": ["必须提供空 JSON 对象。"]})
-        payload = EmptyCheckSerializer(data=request.data)
-        payload.is_valid(raise_exception=True)
-        try:
-            key = uuid.UUID(request.headers.get("Idempotency-Key", ""))
-        except (ValueError, AttributeError):
-            raise ValidationError(
-                {"idempotency_key": ["必须提供 UUID 形式的操作标识。"]}
-            ) from None
-        job, created, published = submit_check(key)
-        location = f"/api/v1/jobs/{job.pk}/"
-        if not published:
-            return Response(
-                error_body(
-                    "SERVICE_UNAVAILABLE",
-                    "任务投递未确认，记录已保存，请查询任务状态。",
-                    getattr(request, "request_id"),
-                    {"job_url": location},
-                ),
-                status=503,
-                headers={"Location": location},
-            )
-        return Response(
-            JobSerializer(job).data,
-            status=202 if created else 200,
-            headers={"Location": location},
-        )
+        retired_feature("system_check")
 
 
 class SystemCheckDetailView(APIView):
@@ -134,7 +105,7 @@ class JobRetriesView(APIView):
 
     @extend_schema(
         operation_id="jobs_retry",
-        description="仅重试失败任务。检查、分析、对比和实验提交空 JSON；导入重传原 ZIP；讲解提交新的 consent_id 并确认可能重复计费。",
+        description="仅显式重试失败任务。分析、源码扫描、清理提交空 JSON；ZIP 导入重传原文件，文件夹使用专用入口；讲解提交新的 consent_id 并确认可能重复计费。退役类型与已清理结果返回 410。",
         request={
             "application/json": {
                 "oneOf": [
@@ -179,6 +150,13 @@ class JobRetriesView(APIView):
             raise ValidationError({"query": ["不支持此查询参数。"]})
         previous = get_object_or_404(Job, pk=job_id)
         key = operation_key(request)
+        require_retryable(previous, key)
+        if previous.kind == "import" and previous.source_kind == "folder":
+            raise ApiProblem(
+                422,
+                "FOLDER_RETRY_REQUIRED",
+                "文件夹任务请重新选择原文件夹并使用文件夹恢复入口。",
+            )
         upload = None
         consent_id = None
         if previous.kind == "import":
@@ -260,6 +238,8 @@ class JobsView(APIView):
                     "explanation",
                     "lab",
                     "snapshot_comparison",
+                    "source_scan",
+                    "delete",
                 ],
             ),
             OpenApiParameter("snapshot_id", str, pattern=r"^[0-9a-f-]{36}$"),
@@ -283,6 +263,8 @@ class JobsView(APIView):
                 "explanation",
                 "lab",
                 "snapshot_comparison",
+                "source_scan",
+                "delete",
             }:
                 raise ValidationError({name: ["任务类型不受支持。"]})
             if name == "snapshot_id":

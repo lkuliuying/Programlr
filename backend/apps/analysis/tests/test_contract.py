@@ -1,7 +1,10 @@
 import json
 import uuid
+from unittest.mock import patch
 
 import pytest
+from django.conf import settings
+from django.test import override_settings
 
 from apps.jobs.tests.test_contract import contract_schema
 from apps.jobs.tests.test_jobs import client_with_token
@@ -67,14 +70,27 @@ def test_analysis_contract_has_strict_input_and_evidence() -> None:
         {"root_urlconf": "urls.py", "command": "ignored"},
     ],
 )
-def test_analysis_rejects_invalid_inputs_before_database(payload: object) -> None:
-    response = client_with_token().generic(
-        "POST",
-        PATH.format(snapshot_id=uuid.uuid4()),
-        json.dumps(payload),
-        content_type="application/json",
-        HTTP_IDEMPOTENCY_KEY=str(uuid.uuid4()),
-    )
+def test_analysis_rejects_invalid_inputs_before_database_without_audit(
+    payload: object,
+) -> None:
+    # 无服务契约检查隔离持久审计；真实拒绝日志由独立 PostgreSQL 测试验证。
+    middleware = [
+        name
+        for name in settings.MIDDLEWARE
+        if name != "apps.jobs.audit_middleware.OperationLogMiddleware"
+    ]
+    with (
+        override_settings(MIDDLEWARE=middleware),
+        patch("apps.analysis.api.views.get_object_or_404") as lookup,
+    ):
+        response = client_with_token().generic(
+            "POST",
+            PATH.format(snapshot_id=uuid.uuid4()),
+            json.dumps(payload),
+            content_type="application/json",
+            HTTP_IDEMPOTENCY_KEY=str(uuid.uuid4()),
+        )
+    assert not lookup.called
     assert response.status_code == 400
 
 

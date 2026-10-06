@@ -10,7 +10,13 @@ from apps.analysis.associations import associate, extend_graph
 from apps.analysis.frontend_runner import run_frontend_parser, validate_frontend
 from apps.analysis.frontend_types import ASSOCIATION_RULE_VERSION, FrontendAnalysis
 from apps.analysis.graph import build_graph, select_graph, validate_graph
-from apps.analysis.models import Analysis, AnalysisGraph, AnalysisRequest
+from apps.analysis.models import (
+    Analysis,
+    AnalysisGraph,
+    AnalysisRequest,
+    SnapshotPreparation,
+    SourceScan,
+)
 from apps.analysis.runner import run_parser
 from apps.analysis.types import (
     GRAPH_VERSION,
@@ -24,8 +30,9 @@ from apps.jobs import services as jobs
 from apps.jobs.models import Job
 from apps.projects.exceptions import ImportRejected
 from apps.projects.models import Snapshot, SourceFile
-from apps.projects.services import source_content
+from apps.projects.services import snapshot_contents
 from common.errors import ApiProblem
+from common.resource_state import lock_snapshot, require_snapshot_available
 
 logger = logging.getLogger(__name__)
 
@@ -36,25 +43,76 @@ def submit_analysis(
     root_urlconf: str,
     *,
     previous: Job | None = None,
+    source_scan: SourceScan | None = None,
+    parent: Job | None = None,
+    defer_dispatch: bool = False,
 ) -> tuple[Job, bool, bool]:
     digest = hashlib.sha256(
         json.dumps({"root_urlconf": root_urlconf}, sort_keys=True).encode()
     ).hexdigest()
     with transaction.atomic():
+        snapshot = lock_snapshot(snapshot.pk)
+        preparation = (
+            SnapshotPreparation.objects.select_for_update()
+            .filter(snapshot=snapshot)
+            .first()
+        )
+        if previous is not None:
+            source_scan = AnalysisRequest.objects.get(job=previous).source_scan
+        elif source_scan is None and preparation is not None:
+            source_scan = preparation.source_scan
+        if source_scan is not None and source_scan.snapshot_id != snapshot.pk:
+            raise ApiProblem(409, "SCAN_SCOPE_MISMATCH", "源码扫描必须属于当前快照。")
         if previous is not None:
             job, created = jobs.create_retry_job(previous, key, digest)
         else:
-            job, created = jobs.create_analysis_job(snapshot.pk, key, digest)
-        if created:
-            AnalysisRequest.objects.create(
-                job=job, snapshot=snapshot, root_urlconf=root_urlconf
+            job, created = jobs.create_analysis_job(
+                snapshot.pk,
+                key,
+                digest,
+                parent=parent,
+                source_kind=parent.source_kind
+                if parent
+                else source_scan.job.source_kind
+                if source_scan
+                else snapshot.job.source_kind,
             )
-    published = jobs.dispatch_analysis(job) if created else True
+        if created:
+            if source_scan is not None and root_urlconf not in {
+                item["file_path"] for item in source_scan.result["roots"]["candidates"]
+            }:
+                raise ApiProblem(
+                    400, "ROOT_NOT_AVAILABLE", "请选择此快照扫描确认的根路由候选。"
+                )
+            AnalysisRequest.objects.create(
+                job=job,
+                snapshot=snapshot,
+                root_urlconf=root_urlconf,
+                source_scan=source_scan,
+            )
+            if preparation is not None:
+                preparation.analysis_job = job
+                preparation.analysis = None
+                preparation.status = "analyzing"
+                preparation.save(update_fields=["analysis_job", "analysis", "status"])
+            if defer_dispatch:
+
+                def dispatch() -> None:
+                    try:
+                        jobs.dispatch_analysis(job)
+                    except DatabaseError as exc:
+                        logger.error(
+                            "job_id=%s dispatch_type=%s", job.pk, type(exc).__name__
+                        )
+
+                transaction.on_commit(dispatch)
+    published = jobs.dispatch_analysis(job) if created and not defer_dispatch else True
     job.refresh_from_db()
     return job, created, published
 
 
 def execute_analysis(job_id: str) -> None:
+    record: AnalysisRequest | None = None
     try:
         claim = jobs.claim_analysis(job_id)
     except DatabaseError:
@@ -62,12 +120,26 @@ def execute_analysis(job_id: str) -> None:
     if claim is None:
         return
     try:
-        record = AnalysisRequest.objects.select_related("snapshot").get(job_id=job_id)
+        record = AnalysisRequest.objects.select_related(
+            "snapshot", "snapshot__project"
+        ).get(job_id=job_id)
+        require_snapshot_available(record.snapshot)
         files = SourceFile.objects.filter(snapshot=record.snapshot).select_related(
-            "snapshot"
+            "snapshot", "snapshot__project"
         )
+        contents = {
+            source.file_path: content
+            for source, content in snapshot_contents(
+                record.snapshot,
+                [
+                    source
+                    for source in files
+                    if source.file_path.endswith((".py", ".js", ".jsx", ".ts", ".tsx"))
+                ],
+            )
+        }
         sources = [
-            Source(source.file_path, source_content(source, 1, source.line_count))
+            Source(source.file_path, contents[source.file_path])
             for source in files
             if source.file_path.endswith(".py")
         ]
@@ -78,7 +150,7 @@ def execute_analysis(job_id: str) -> None:
             len(files) - len(sources),
         )
         frontend_sources = [
-            Source(source.file_path, source_content(source, 1, source.line_count))
+            Source(source.file_path, contents[source.file_path])
             for source in files
             if source.file_path.endswith((".js", ".jsx", ".ts", ".tsx"))
         ]
@@ -115,17 +187,22 @@ def execute_analysis(job_id: str) -> None:
         )
 
         def publish() -> str:
+            lock_snapshot(record.snapshot_id)
             analysis = Analysis.objects.create(
                 id=analysis_id,
                 job_id=job_id,
                 snapshot=record.snapshot,
                 root_urlconf=record.root_urlconf,
                 frontend=frontend,
+                source_scan=record.source_scan,
                 **result,
             )
             AnalysisGraph.objects.create(
                 analysis=analysis, graph_version=GRAPH_VERSION, **graph
             )
+            SnapshotPreparation.objects.filter(
+                snapshot_id=record.snapshot_id, analysis_job_id=uuid.UUID(job_id)
+            ).update(status="ready", analysis=analysis)
             return f"/api/v1/analyses/{analysis.pk}/"
 
         jobs.complete_analysis(job_id, claim, publish)
@@ -142,11 +219,18 @@ def execute_analysis(job_id: str) -> None:
             logger.error("job_id=%s exception_type=%s", job_id, type(exc).__name__)
         try:
             jobs.fail_analysis(job_id, claim, code, reason)
+            if record is not None:
+                SnapshotPreparation.objects.filter(
+                    snapshot_id=record.snapshot_id,
+                    analysis_job_id=uuid.UUID(job_id),
+                    analysis_job__status=Job.Status.FAILED,
+                ).update(status="failed")
         except DatabaseError:
             raise RuntimeError("分析状态需等待期限核对。") from None
 
 
 def read_graph(analysis: Analysis) -> tuple[GraphData, str]:
+    require_snapshot_available(analysis.snapshot)
     record = AnalysisGraph.objects.filter(analysis=analysis).first()
     if record is None:
         raise ApiProblem(
@@ -184,6 +268,7 @@ def query_graph(analysis: Analysis, query: GraphQuery) -> GraphSelection:
 
 def read_frontend(analysis: Analysis) -> FrontendAnalysis | None:
     """历史未分析与有效空结果分开；读取只校验，不执行分析。"""
+    require_snapshot_available(analysis.snapshot)
     value: Any = analysis.frontend
     if value is None:
         return None

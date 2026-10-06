@@ -20,10 +20,13 @@ from apps.learning.api.serializers import (
     KnowledgeCardSerializer,
 )
 from apps.learning.models import Exercise, ExerciseAttempt, KnowledgeCard
-from apps.learning.services import submit_attempt
-from common.api import json_input, operation_key, page_response, resource_filters
+from common.api import page_response, resource_filters
+from common.resource_state import require_snapshot_available
+from common.retirement import retired_feature
 
-ERRORS = {status: ErrorSerializer for status in (400, 403, 404, 409, 413, 415, 503)}
+ERRORS = {
+    status: ErrorSerializer for status in (400, 403, 404, 409, 410, 413, 415, 503)
+}
 PAGES = [OpenApiParameter("page", int), OpenApiParameter("page_size", int)]
 WORKSPACE = [
     OpenApiParameter("analysis_id", uuid.UUID, required=True),
@@ -35,7 +38,10 @@ def workspace(request: Request) -> tuple[dict[str, str], dict[str, Any]]:
     filters = resource_filters(request, ("analysis_id", "endpoint_index"))
     if set(filters) != {"analysis_id", "endpoint_index"}:
         raise ValidationError({"query": ["必须指定 analysis_id 和 endpoint_index。"]})
-    analysis = get_object_or_404(Analysis, pk=filters["analysis_id"])
+    analysis = get_object_or_404(
+        Analysis.objects.select_related("snapshot__project"), pk=filters["analysis_id"]
+    )
+    require_snapshot_available(analysis.snapshot)
     index = int(filters["endpoint_index"])
     if index >= len(analysis.endpoints):
         raise ValidationError({"endpoint_index": ["接口序号越界。"]})
@@ -119,30 +125,27 @@ class ExerciseAttemptsView(APIView):
         )
         return page_response(
             request,
-            ExerciseAttempt.objects.select_related("exercise").filter(**filters),
+            ExerciseAttempt.objects.select_related("exercise").filter(
+                snapshot__deletion_request_id__isnull=True,
+                snapshot__project__deletion_request_id__isnull=True,
+                **filters,
+            ),
             ExerciseAttemptSerializer,
             filters=filters,
         )
 
     @extend_schema(
         operation_id="exercise_attempts_create",
+        deprecated=True,
         request=AttemptInputSerializer,
         parameters=[
             OpenApiParameter(name, str, OpenApiParameter.HEADER, required=True)
             for name in ("Idempotency-Key", "X-CSRFToken", "Origin")
         ],
-        responses={
-            200: ExerciseAttemptSerializer,
-            201: ExerciseAttemptSerializer,
-            **ERRORS,
-        },
+        responses=ERRORS,
     )
     def post(self, request: Request) -> Response:
-        values = json_input(request, AttemptInputSerializer).validated_data
-        attempt, created = submit_attempt(operation_key(request), values)
-        return Response(
-            ExerciseAttemptSerializer(attempt).data, status=201 if created else 200
-        )
+        retired_feature("exercise")
 
 
 class ExerciseAttemptDetailView(APIView):
@@ -151,10 +154,9 @@ class ExerciseAttemptDetailView(APIView):
         responses={200: ExerciseAttemptSerializer, **ERRORS},
     )
     def get(self, request: Request, attempt_id: uuid.UUID) -> Response:
-        return Response(
-            ExerciseAttemptSerializer(
-                get_object_or_404(
-                    ExerciseAttempt.objects.select_related("exercise"), pk=attempt_id
-                )
-            ).data
+        attempt = get_object_or_404(
+            ExerciseAttempt.objects.select_related("exercise", "snapshot__project"),
+            pk=attempt_id,
         )
+        require_snapshot_available(attempt.snapshot)
+        return Response(ExerciseAttemptSerializer(attempt).data)

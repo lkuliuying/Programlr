@@ -15,11 +15,14 @@ from apps.analysis.api.review_serializers import (
     RelationReviewStateSerializer,
 )
 from apps.analysis.models import Analysis, RelationReview
-from apps.analysis.reviews import current_review, request_candidates, submit_review
+from apps.analysis.reviews import current_review, request_candidates
 from apps.jobs.api.serializers import ErrorSerializer
-from common.api import json_input, operation_key, page_response, resource_filters
+from common.api import page_response, resource_filters
+from common.retirement import retired_feature
 
-ERRORS = {status: ErrorSerializer for status in (400, 403, 404, 409, 413, 415, 503)}
+ERRORS = {
+    status: ErrorSerializer for status in (400, 403, 404, 409, 410, 413, 415, 503)
+}
 
 
 class RelationReviewsView(APIView):
@@ -64,17 +67,4 @@ class RelationReviewsView(APIView):
         },
     )
     def post(self, request: Request, analysis_id: uuid.UUID) -> Response:
-        payload = json_input(request, RelationReviewInputSerializer).validated_data
-        analysis = get_object_or_404(Analysis, pk=analysis_id)
-        record, state, created = submit_review(
-            analysis,
-            operation_key(request),
-            payload["request_id"],
-            payload["target_id"],
-            payload["action"],
-            payload["expected_revision"],
-        )
-        return Response(
-            RelationReviewResultSerializer({"record": record, "state": state}).data,
-            status=201 if created else 200,
-        )
+        retired_feature("relation_reviews")

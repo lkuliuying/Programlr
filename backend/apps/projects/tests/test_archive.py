@@ -20,8 +20,27 @@ def zip_bytes(
     result = io.BytesIO()
     with zipfile.ZipFile(result, "w", compression=compression) as archive:
         for name, content in entries.items():
-            archive.writestr(name, content)
+            # ZIP 时间精度为两秒，固定夹具时间才能在重复上传时比较原始字节。
+            info = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
+            info.external_attr = (
+                (0o40775 << 16) | 0x10 if name.endswith("/") else 0o600 << 16
+            )
+            archive.writestr(info, content, compress_type=compression)
     return result.getvalue()
+
+
+def test_zip_fixture_preserves_same_bytes_across_wall_clock_boundaries(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        time, "localtime", lambda *args: (2026, 10, 3, 18, 0, 0, 5, 276, -1)
+    )
+    original = zip_bytes({"a.py": b"one\r\ntwo\n"})
+    monkeypatch.setattr(
+        time, "localtime", lambda *args: (2026, 10, 3, 18, 0, 2, 5, 276, -1)
+    )
+    assert zip_bytes({"a.py": b"one\r\ntwo\n"}) == original
+    assert zip_bytes({"a.py": b"different"}) != original
 
 
 def prepare(

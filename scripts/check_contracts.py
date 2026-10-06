@@ -16,6 +16,7 @@ TARGETS = (
     ("workbench", Path("."), "apps/jobs/tests/test_contract.py"),
     ("task-board", Path("examples/task-board"), "apps/tasks/tests/test_contract.py"),
 )
+OPERATION_COUNTS = {"workbench": 83, "task-board": 3, "lab-board": 7}
 
 
 def require_equal(actual: str, expected: str, label: str) -> None:
@@ -27,7 +28,7 @@ def verify_catalog(schema: dict[str, Any], catalog: str, service: str) -> None:
     documented = {
         (method.lower(), path, operation)
         for name, method, path, operation in re.findall(
-            r"^\| (workbench|task-board|lab-board) \| (GET|POST|PATCH) \| `([^`]+)` \| `([^`]+)` \|",
+            r"^\| (workbench|task-board|lab-board) \| (GET|POST|PATCH|DELETE) \| `([^`]+)` \| `([^`]+)` \|",
             catalog,
             re.MULTILINE,
         )
@@ -41,6 +42,19 @@ def verify_catalog(schema: dict[str, Any], catalog: str, service: str) -> None:
     }
     if not documented or implemented != documented:
         raise ValueError(f"{service} 的已实现接口表与实际 Schema 不一致。")
+
+
+def verify_operation_count(schema: dict[str, Any], service: str) -> None:
+    operations = [
+        operation["operationId"]
+        for methods in schema["paths"].values()
+        for method, operation in methods.items()
+        if method in {"get", "post", "put", "patch", "delete", "head", "options"}
+    ]
+    if len(operations) != OPERATION_COUNTS[service] or len(set(operations)) != len(
+        operations
+    ):
+        raise ValueError(f"{service} 的操作数量或唯一标识不符合已批准清单。")
 
 
 def run(command: list[str], cwd: Path) -> None:
@@ -84,7 +98,9 @@ def main() -> int:
                     (base / "contracts/openapi.yaml").read_text(encoding="utf-8"),
                     f"{service} OpenAPI",
                 )
-                verify_catalog(yaml.safe_load(content), catalog, service)
+                schema = yaml.safe_load(content)
+                verify_catalog(schema, catalog, service)
+                verify_operation_count(schema, service)
                 run(
                     [
                         sys.executable,
@@ -138,7 +154,9 @@ def main() -> int:
                 ),
                 "lab-board OpenAPI",
             )
-            verify_catalog(yaml.safe_load(content), catalog, "lab-board")
+            schema = yaml.safe_load(content)
+            verify_catalog(schema, catalog, "lab-board")
+            verify_operation_count(schema, "lab-board")
     except (OSError, ValueError, subprocess.SubprocessError) as exc:
         print(f"契约检查失败：{exc}", file=sys.stderr)
         return 1

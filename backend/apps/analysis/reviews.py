@@ -1,16 +1,13 @@
-"""追加人工候选决定，不改写静态图或讲解所用证据。"""
+"""读取历史人工候选决定；写入入口已退役。"""
 
-import hashlib
-import json
 import uuid
 from typing import Literal, TypedDict
-
-from django.db import transaction
 
 from apps.analysis.models import Analysis, RelationReview, RelationReviewState
 from apps.analysis.services import read_graph
 from apps.analysis.types import GraphData
-from common.errors import ApiProblem, Conflict
+from common.errors import ApiProblem
+from common.retirement import retired_feature
 
 ReviewAction = Literal["confirm", "exclude", "reset"]
 
@@ -140,74 +137,4 @@ def submit_review(
     action: ReviewAction,
     expected_revision: int,
 ) -> tuple[RelationReview, ReviewStateData, bool]:
-    digest = hashlib.sha256(
-        json.dumps(
-            {
-                "analysis_id": str(analysis.pk),
-                "request_id": str(request_id),
-                "target_id": str(target_id),
-                "action": action,
-                "expected_revision": expected_revision,
-            },
-            sort_keys=True,
-        ).encode()
-    ).hexdigest()
-    with transaction.atomic():
-        # 首次请求状态尚不存在时也使用同一归属锁，避免并发创建与幂等重放竞争。
-        Analysis.objects.select_for_update().get(pk=analysis.pk)
-        previous = RelationReview.objects.filter(
-            analysis=analysis, idempotency_key=key
-        ).first()
-        if previous is not None:
-            if previous.request_digest != digest:
-                raise Conflict()
-            return previous, current_review(analysis, request_id), False
-        candidates = request_candidates(analysis, request_id)
-        if str(target_id) not in candidates:
-            raise ApiProblem(
-                409, "RELATION_NOT_CANDIDATE", "只能处理当前分析已有的请求—接口候选。"
-            )
-        record = RelationReviewState.objects.filter(
-            analysis=analysis, request_id=request_id
-        ).first()
-        state = state_data(analysis, request_id, record)
-        if expected_revision != state["revision"]:
-            raise ApiProblem(
-                409,
-                "RELATION_REVISION_CONFLICT",
-                "该请求的人工决定已变更，请重新读取后判断。",
-                {
-                    "current_revision": state["revision"],
-                },
-            )
-        if action not in {"confirm", "exclude", "reset"}:
-            raise ApiProblem(400, "VALIDATION_ERROR", "人工决定动作无效。")
-        excluded = set(state["excluded_target_ids"])
-        confirmed = state["confirmed_target_id"]
-        if action == "confirm":
-            confirmed = str(target_id)
-            excluded.discard(str(target_id))
-        elif action == "exclude":
-            excluded.add(str(target_id))
-            if confirmed == str(target_id):
-                confirmed = None
-        else:
-            excluded.discard(str(target_id))
-            if confirmed == str(target_id):
-                confirmed = None
-        if record is None:
-            record = RelationReviewState(analysis=analysis, request_id=request_id)
-        record.revision = state["revision"] + 1
-        record.confirmed_target_id = uuid.UUID(confirmed) if confirmed else None
-        record.excluded_target_ids = sorted(excluded)
-        record.save()
-        review = RelationReview.objects.create(
-            analysis=analysis,
-            request_id=request_id,
-            target_id=target_id,
-            action=action,
-            revision=record.revision,
-            idempotency_key=key,
-            request_digest=digest,
-        )
-        return review, state_data(analysis, request_id, record), True
+    retired_feature("relation_reviews")

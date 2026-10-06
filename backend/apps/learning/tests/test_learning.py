@@ -14,14 +14,15 @@ from apps.analysis.models import Analysis
 from apps.analysis.services import execute_analysis, submit_analysis
 from apps.jobs.tests.test_contract import assert_response, contract_schema
 from apps.jobs.tests.test_jobs import client_with_token
-from apps.learning.content import CONTENT_ROOT, load_content
+from apps.learning.content import CONTENT_ROOT, load_cards_only, load_content
 from apps.learning.models import Exercise, ExerciseAttempt, KnowledgeCard
 from apps.learning.services import applicability, submit_attempt, validate_answer
+from apps.learning.tests.history import historical_attempt, seed_history
 from apps.projects.models import Snapshot, SourceFile
 from apps.projects.services import create_project, execute_import, submit_import
 from apps.projects.tests.test_archive import zip_bytes
 from apps.projects.tests.test_projects import upload
-from common.errors import ApiProblem, Conflict
+from common.errors import ApiProblem
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -33,7 +34,7 @@ def analysis(tmp_path: Path) -> Any:
         APP_ORIGIN="http://127.0.0.1:5173",
         APP_AUTHORITY="127.0.0.1:5173",
     ):
-        load_content()
+        seed_history()
         root = CONTENT_ROOT.parent / "examples/task-board"
         bundle = json.loads(
             (CONTENT_ROOT / "exercises/task-board-create.json").read_text()
@@ -72,11 +73,11 @@ def values(analysis: Analysis, exercise: Exercise) -> dict[str, Any]:
     }
 
 
-def test_three_types_correct_incorrect_and_api_never_leaks_answers(
+def test_three_historical_types_remain_readable_and_attempt_api_is_retired(
     analysis: Analysis,
 ) -> None:
     client, schema = client_with_token(), contract_schema()
-    assert KnowledgeCard.objects.count() == 8 and Exercise.objects.count() == 3
+    assert KnowledgeCard.objects.count() == 29 and Exercise.objects.count() == 3
     for exercise in Exercise.objects.select_related("example"):
         data = values(analysis, exercise)
         listing = client.get(
@@ -93,25 +94,22 @@ def test_three_types_correct_incorrect_and_api_never_leaks_answers(
         result = client.post(
             "/api/v1/exercise-attempts/", data, format="json", HTTP_IDEMPOTENCY_KEY=key
         )
-        assert (
-            result.status_code == 201
-            and result.json()["correct"]
-            and not result.json()["hint_used"]
-        )
+        assert result.status_code == 410 and result.json()["code"] == "FEATURE_RETIRED"
         assert_response(result, schema, "/api/v1/exercise-attempts/", "post")
         repeat = client.post(
             "/api/v1/exercise-attempts/", data, format="json", HTTP_IDEMPOTENCY_KEY=key
         )
-        assert repeat.status_code == 200 and repeat.json()["id"] == result.json()["id"]
+        assert repeat.status_code == 410
+        historical_attempt(data)
         if exercise.kind == "flow_order":
             wrong: Any = list(reversed(exercise.answer))
         elif exercise.kind == "error_prediction":
             wrong = {key: {"status": 200, "writes": 0} for key in exercise.answer}
         else:
             wrong = {**exercise.answer, "start_line": 1, "end_line": 1}
-        attempt = submit_attempt(
-            uuid.uuid4(), {**data, "answer": wrong, "hint_used": True}
-        )[0]
+        attempt = historical_attempt(
+            {**data, "answer": wrong, "hint_used": True}, correct=False
+        )
         assert not attempt.correct and attempt.hint_used
         detail = client.get(f"/api/v1/exercise-attempts/{attempt.pk}/")
         assert_response(
@@ -135,34 +133,38 @@ def test_invalid_version_digest_and_types(analysis: Analysis) -> None:
                 validate_answer(exercise.kind, exercise.options, invalid)
         with pytest.raises(ApiProblem) as failure:
             submit_attempt(uuid.uuid4(), {**data, "exercise_version": "old"})
-        assert failure.value.machine_code == "EXERCISE_VERSION_MISMATCH"
+        assert failure.value.machine_code == "FEATURE_RETIRED"
         with pytest.raises(ApiProblem) as failure:
             submit_attempt(uuid.uuid4(), {**data, "snapshot_id": uuid.uuid4()})
-        assert failure.value.machine_code == "EXERCISE_NOT_APPLICABLE"
+        assert failure.value.machine_code == "FEATURE_RETIRED"
     SourceFile.objects.filter(snapshot=analysis.snapshot).update(sha256="0" * 64)
     assert not applicability(exercise, analysis, data["endpoint_index"])[0]
     with pytest.raises(ApiProblem) as failure:
         submit_attempt(uuid.uuid4(), data)
     assert (
-        failure.value.machine_code == "EXERCISE_NOT_APPLICABLE"
+        failure.value.machine_code == "FEATURE_RETIRED"
         and not ExerciseAttempt.objects.exists()
     )
 
 
-def test_concurrent_attempt_replay_and_conflict(analysis: Analysis) -> None:
+def test_concurrent_attempt_requests_never_create_or_replay_records(
+    analysis: Analysis,
+) -> None:
     data, key = values(analysis, Exercise.objects.get(kind="flow_order")), uuid.uuid4()
 
     def operation(_: int) -> str:
         close_old_connections()
         try:
-            return str(submit_attempt(key, data)[0].pk)
+            with pytest.raises(ApiProblem) as error:
+                submit_attempt(key, data)
+            return error.value.machine_code
         finally:
             close_old_connections()
 
     with ThreadPoolExecutor(max_workers=4) as executor:
         ids = list(executor.map(operation, range(4)))
-    assert len(set(ids)) == 1 and ExerciseAttempt.objects.count() == 1
-    with pytest.raises(Conflict):
+    assert set(ids) == {"FEATURE_RETIRED"} and ExerciseAttempt.objects.count() == 0
+    with pytest.raises(ApiProblem, match="已退役"):
         submit_attempt(key, {**data, "hint_used": True})
 
 
@@ -170,21 +172,20 @@ def test_immutable_content_upgrade_keeps_old_attempts(
     analysis: Analysis, tmp_path: Path
 ) -> None:
     exercise = Exercise.objects.get(kind="code_location")
-    attempt = submit_attempt(uuid.uuid4(), values(analysis, exercise))[0]
-    load_content()
+    attempt = historical_attempt(values(analysis, exercise))
+    assert load_content() == (29, 0)
     assert Exercise.objects.count() == 3
     directory = tmp_path / "content"
     shutil.copytree(CONTENT_ROOT, directory)
-    path = directory / "exercises/task-board-create.json"
-    bundle = json.loads(path.read_text())
-    bundle["exercises"][0]["question"] += " 新版本"
-    path.write_text(json.dumps(bundle))
+    path = directory / "knowledge/source-mainline.json"
+    cards = json.loads(path.read_text())
+    cards[0]["body"] += " 新版本"
+    path.write_text(json.dumps(cards))
     with pytest.raises(ValueError, match="同版本"):
-        load_content(directory)
-    bundle["exercises"][0]["version"] = "1.1.0"
-    bundle["exercises"][0]["answer_version"] = "1.1.0"
-    path.write_text(json.dumps(bundle))
-    load_content(directory)
-    assert Exercise.objects.count() == 4
+        load_cards_only(directory)
+    cards[0]["version"] = "1.2.0"
+    path.write_text(json.dumps(cards))
+    load_cards_only(directory)
+    assert Exercise.objects.count() == 3 and KnowledgeCard.objects.count() == 30
     attempt.refresh_from_db()
     assert attempt.exercise.version == "1.0.0" and attempt.correct

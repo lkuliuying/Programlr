@@ -1,13 +1,12 @@
-"""按版本原子发布可信知识配置；任何校验失败都保留原内容。"""
+"""保留历史课程定义的校验，课程发布写入入口已退役。"""
 
 from pathlib import Path
 from typing import Any
 
-from django.db import transaction
-
-from apps.learning.content import TEXT, VERSION, content_digest, read_content
-from apps.learning.models import KnowledgeCard, KnowledgeCurriculum, TeachingExample
+from apps.learning.content import TEXT, VERSION
+from apps.learning.models import KnowledgeCard, TeachingExample
 from apps.learning.paths.graph import build_graph
+from common.retirement import retired_feature
 
 NODE = {
     "type": "object",
@@ -72,24 +71,4 @@ def validate_definition(value: dict[str, Any]) -> None:
 
 
 def load_curricula(root: Path) -> int:
-    definitions = [
-        read_content(path, CURRICULUM)
-        for path in sorted((root / "paths").glob("*.json"))
-    ]
-    if not 1 <= len(definitions) <= 20:
-        raise ValueError("知识先修配置缺失或超过上限。")
-    with transaction.atomic():
-        for value in definitions:
-            validate_definition(value)
-            record, _ = KnowledgeCurriculum.objects.get_or_create(
-                slug=value["slug"],
-                version=value["version"],
-                defaults={
-                    "title": value["title"],
-                    "definition": value,
-                    "content_digest": content_digest(value),
-                },
-            )
-            if record.content_digest != content_digest(value):
-                raise ValueError("先修配置同版本内容漂移，必须发布新版本。")
-    return len(definitions)
+    retired_feature("course_publication")

@@ -129,6 +129,7 @@ class CoverageSerializer(serializers.Serializer[dict[str, Any]]):
 
 
 class AnalysisSerializer(serializers.ModelSerializer[Analysis]):
+    source_scan_id = serializers.UUIDField(read_only=True, allow_null=True)
     job_id = serializers.UUIDField(read_only=True)
     snapshot_id = serializers.UUIDField(read_only=True)
     coverage = CoverageSerializer(read_only=True)
@@ -164,6 +165,7 @@ class AnalysisSerializer(serializers.ModelSerializer[Analysis]):
             "coverage",
             "frontend",
             "created_at",
+            "source_scan_id",
         ]
         read_only_fields = fields
 

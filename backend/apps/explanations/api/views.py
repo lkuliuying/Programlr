@@ -25,6 +25,7 @@ from apps.explanations.services import (
 from apps.jobs.api.serializers import ErrorSerializer, JobSerializer
 from common.api import json_input, operation_key, page_response, resource_filters
 from common.errors import error_body
+from common.resource_state import require_snapshot_available
 
 ERRORS = {status: ErrorSerializer for status in (400, 403, 404, 409, 413, 415, 503)}
 POST_HEADERS = [
@@ -111,7 +112,9 @@ class ExplanationsView(APIView):
             request, ("snapshot_id", "analysis_id", "endpoint_index")
         )
         results = Explanation.objects.select_related("preview").filter(
-            **{"preview__" + k: v for k, v in filters.items()}
+            preview__snapshot__deletion_request_id__isnull=True,
+            preview__snapshot__project__deletion_request_id__isnull=True,
+            **{"preview__" + k: v for k, v in filters.items()},
         )
         return page_response(request, results, ExplanationSerializer, filters=filters)
 
@@ -156,10 +159,9 @@ class ExplanationDetailView(APIView):
         responses={200: ExplanationSerializer, **ERRORS},
     )
     def get(self, request: Request, explanation_id: uuid.UUID) -> Response:
-        return Response(
-            ExplanationSerializer(
-                get_object_or_404(
-                    Explanation.objects.select_related("preview"), pk=explanation_id
-                )
-            ).data
+        explanation = get_object_or_404(
+            Explanation.objects.select_related("preview__snapshot__project"),
+            pk=explanation_id,
         )
+        require_snapshot_available(explanation.preview.snapshot)
+        return Response(ExplanationSerializer(explanation).data)

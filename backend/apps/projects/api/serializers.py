@@ -65,6 +65,22 @@ class SnapshotSerializer(serializers.ModelSerializer[Snapshot]):
     job_id = serializers.UUIDField(read_only=True)
     summary = ImportSummarySerializer(read_only=True)
     source_extensions = serializers.SerializerMethodField()
+    source_manifest_names = serializers.SerializerMethodField()
+    preparation_status = serializers.CharField(read_only=True)
+    source_scan_id = serializers.UUIDField(read_only=True, allow_null=True)
+    scan_job_id = serializers.UUIDField(read_only=True, allow_null=True)
+    analysis_job_id = serializers.UUIDField(read_only=True, allow_null=True)
+    analysis_id = serializers.UUIDField(read_only=True, allow_null=True)
+
+    def get_source_manifest_names(self, obj: Snapshot) -> list[str]:
+        return ["requirements*.txt", "pyproject.toml"]
+
+    def to_representation(self, instance: Any) -> dict[str, Any]:
+        from apps.analysis.scans import preparation_fields
+
+        cached = self.context.get("preparation_fields", {}).get(instance.pk)
+        fields = cached if cached is not None else preparation_fields(instance)
+        return {**super().to_representation(instance), **fields}
 
     def get_source_extensions(self, obj: Snapshot) -> list[str]:
         return list(SOURCE_EXTENSIONS)
@@ -78,6 +94,12 @@ class SnapshotSerializer(serializers.ModelSerializer[Snapshot]):
             "job_id",
             "summary",
             "source_extensions",
+            "source_manifest_names",
+            "preparation_status",
+            "source_scan_id",
+            "scan_job_id",
+            "analysis_job_id",
+            "analysis_id",
             "created_at",
         ]
         read_only_fields = fields

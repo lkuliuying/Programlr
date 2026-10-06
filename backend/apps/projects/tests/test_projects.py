@@ -18,7 +18,7 @@ from kombu.exceptions import OperationalError
 from rest_framework.test import APIClient
 
 from apps.jobs.models import Job
-from apps.jobs.services import reconcile_expired, submit_check
+from apps.jobs.services import reconcile_expired
 from apps.jobs.tests.test_contract import assert_response, contract_schema
 from apps.jobs.tests.test_jobs import client_with_token
 from apps.projects.models import ImportRequest, Project, Snapshot, SourceFile
@@ -245,7 +245,16 @@ def test_import_idempotency_scope_conflict_and_queue_failure() -> None:
         with pytest.raises(Conflict):
             submit_import(owner, key, upload(zip_bytes({"a.py": b"different"})))
         assert submit_import(other, key, upload())[0].pk != first.pk
-        assert submit_check(key)[0].pk != first.pk
+        folder = submit_import(
+            owner,
+            key,
+            None,
+            folder_files=[SimpleUploadedFile("a.py", b"one\ntwo\n")],
+            manifest=SimpleUploadedFile(
+                "manifest.json", b'{"files":[{"path":"a.py","index":0}]}'
+            ),
+        )[0]
+        assert folder.pk != first.pk and folder.source_kind == "folder"
         assert send.call_count == 3
     with patch(
         "apps.jobs.services.app.send_task", side_effect=OperationalError("synthetic")

@@ -124,3 +124,13 @@ def json_input(
     parsed = serializer(data=request.data)
     parsed.is_valid(raise_exception=True)
     return parsed
+
+
+def text_query(request: Request) -> dict[str, str]:
+    """保留筛选文本与分页链接，拒绝重复参数和超长输入。"""
+    if "q" not in request.query_params:
+        return {}
+    value = request.query_params["q"]
+    if len(request.query_params.getlist("q")) != 1 or len(value) > 200:
+        raise ValidationError({"q": ["必须为单个不超过 200 字符的筛选文本。"]})
+    return {"q": value}

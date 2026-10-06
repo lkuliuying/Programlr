@@ -12,11 +12,14 @@ from rest_framework.test import APIClient
 from apps.jobs.models import Job, SystemCheck
 from apps.jobs.services import (
     EMPTY_DIGEST,
-    complete_check,
+    claim_source_scan,
+    complete_source_scan,
+    create_source_scan_job,
+    dispatch_source_scan,
     execute_check,
     reconcile_expired,
-    submit_check,
 )
+from apps.projects.models import Project, Snapshot
 
 pytestmark = pytest.mark.django_db
 HOST = "127.0.0.1:5173"
@@ -43,6 +46,17 @@ def create_job(**kwargs: object) -> Job:
         **kwargs,
     }
     return Job.objects.create(**fields)
+
+
+def create_snapshot() -> Snapshot:
+    project = Project.objects.create(name="任务隔离夹具", idempotency_key=uuid.uuid4())
+    return Snapshot.objects.create(
+        id=uuid.uuid4(),
+        project=project,
+        job=create_job(kind="import", status="succeeded"),
+        summary={},
+        manifest_digest="0" * 64,
+    )
 
 
 def test_csrf_cookie_and_request_id() -> None:
@@ -119,7 +133,8 @@ def test_fixed_input_rejected(payload: object) -> None:
         content_type="application/json",
         HTTP_IDEMPOTENCY_KEY=str(uuid.uuid4()),
     )
-    assert response.status_code == 400
+    assert response.status_code == 410
+    assert response.json()["code"] == "FEATURE_RETIRED"
     assert not Job.objects.exists()
 
 
@@ -133,17 +148,16 @@ def test_submit_complete_and_replay() -> None:
         second = client.post(
             "/api/v1/system-checks/", {}, format="json", HTTP_IDEMPOTENCY_KEY=key
         )
-    assert first.status_code == 202
-    assert second.status_code == 200
-    assert first.json()["id"] == second.json()["id"]
-    assert send.call_count == 1
-    execute_check(first.json()["id"])
-    execute_check(first.json()["id"])
-    detail = client.get(first["Location"])
+    assert first.status_code == second.status_code == 410
+    send.assert_not_called()
+    assert not Job.objects.exists()
+    job = create_job(status="succeeded")
+    SystemCheck.objects.create(job=job)
+    detail = client.get(f"/api/v1/jobs/{job.pk}/")
     assert detail.json()["status"] == "succeeded"
     result = client.get(detail.json()["result_url"])
     assert result.json()["worker"] == "passed"
-    assert result.json()["job_id"] == first.json()["id"]
+    assert result.json()["job_id"] == str(job.pk)
     assert SystemCheck.objects.count() == 1
     assert "request_digest" not in detail.json()
     assert "idempotency_key" not in detail.json()
@@ -151,22 +165,17 @@ def test_submit_complete_and_replay() -> None:
 
 
 def test_publication_failure_is_retained() -> None:
-    client = client_with_token()
-    key = str(uuid.uuid4())
+    job, _ = create_source_scan_job(create_snapshot().pk, uuid.uuid4(), "0" * 64)
     with patch("apps.jobs.services.app.send_task", side_effect=OSError):
-        response = client.post(
-            "/api/v1/system-checks/", {}, format="json", HTTP_IDEMPOTENCY_KEY=key
-        )
-    assert response.status_code == 503
-    detail = client.get(response["Location"])
+        assert not dispatch_source_scan(job)
+    detail = client_with_token().get(f"/api/v1/jobs/{job.pk}/")
     assert detail.status_code == 200
     assert detail.json()["error"]["code"] == "QUEUE_UNAVAILABLE"
-    replay = client.post(
-        "/api/v1/system-checks/", {}, format="json", HTTP_IDEMPOTENCY_KEY=key
+    replay, created = create_source_scan_job(
+        job.snapshot_id or uuid.uuid4(), job.idempotency_key, job.request_digest
     )
-    assert replay.status_code == 200
-    assert replay.json()["status"] == "failed"
-    execute_check(detail.json()["id"])
+    assert not created and replay.status == "failed"
+    assert claim_source_scan(str(job.pk)) is None
     assert not SystemCheck.objects.exists()
 
 
@@ -178,18 +187,19 @@ def test_conflicting_key() -> None:
         format="json",
         HTTP_IDEMPOTENCY_KEY=str(job.idempotency_key),
     )
-    assert response.status_code == 409
-    assert response.json()["code"] == "IDEMPOTENCY_CONFLICT"
+    assert response.status_code == 410
+    assert response.json()["code"] == "FEATURE_RETIRED"
+    assert Job.objects.count() == 1
 
 
 def test_missing_key_and_wrong_media_type() -> None:
     client = client_with_token()
-    assert client.post("/api/v1/system-checks/", {}, format="json").status_code == 400
+    assert client.post("/api/v1/system-checks/", {}, format="json").status_code == 410
     assert (
         client.post(
             "/api/v1/system-checks/", "{}", content_type="text/plain"
         ).status_code
-        == 415
+        == 410
     )
 
 
@@ -217,7 +227,7 @@ def test_missing_or_malformed_body(body: str) -> None:
         content_type="application/json",
         HTTP_IDEMPOTENCY_KEY=str(uuid.uuid4()),
     )
-    assert response.status_code == 400
+    assert response.status_code == 410
     assert not Job.objects.exists()
 
 
@@ -243,21 +253,26 @@ def test_reconcile_terminal_and_late_result() -> None:
     claim = uuid.uuid4()
     queued = create_job(expires_at=timezone.now() - timedelta(seconds=1))
     running = create_job(
+        kind="source_scan",
         status="running",
         claim_id=claim,
         expires_at=timezone.now() - timedelta(seconds=1),
     )
     assert reconcile_expired() == 2
     assert reconcile_expired() == 0
-    assert not complete_check(str(running.pk), claim)
+    with patch("apps.jobs.services.record_job_event") as event:
+        assert not complete_source_scan(str(running.pk), claim, lambda: "unused")
+    event.assert_not_called()
     execute_check(str(queued.pk))
     assert not SystemCheck.objects.exists()
     assert set(Job.objects.values_list("status", flat=True)) == {"failed"}
 
 
 def test_wrong_execution_claim() -> None:
-    job = create_job(status="running", claim_id=uuid.uuid4())
-    assert not complete_check(str(job.pk), uuid.uuid4())
+    job = create_job(kind="source_scan", status="running", claim_id=uuid.uuid4())
+    with patch("apps.analysis.models.SourceScan.objects.create") as publish:
+        assert not complete_source_scan(str(job.pk), uuid.uuid4(), publish)
+    publish.assert_not_called()
     assert not SystemCheck.objects.exists()
 
 
@@ -271,7 +286,7 @@ def test_worker_failure_has_safe_error() -> None:
     job.refresh_from_db()
     assert job.status == "failed"
     assert job.error is not None
-    assert job.error["code"] == "CHECK_FAILED"
+    assert job.error["code"] == "FEATURE_RETIRED"
     assert "untrusted" not in str(job.error)
 
 
@@ -286,11 +301,14 @@ def test_database_failure_is_visible() -> None:
 
 @pytest.mark.django_db(transaction=True)
 def test_concurrent_idempotency_and_worker_claim() -> None:
-    key = uuid.uuid4()
+    key, snapshot_id = uuid.uuid4(), create_snapshot().pk
 
     def submit() -> str:
         try:
-            return str(submit_check(key)[0].pk)
+            job, created = create_source_scan_job(snapshot_id, key, "0" * 64)
+            if created:
+                dispatch_source_scan(job)
+            return str(job.pk)
         finally:
             close_old_connections()
 
@@ -304,13 +322,18 @@ def test_concurrent_idempotency_and_worker_claim() -> None:
 
     def execute() -> None:
         try:
-            execute_check(ids[0])
+            claim = claim_source_scan(ids[0])
+            if claim is not None:
+                complete_source_scan(
+                    ids[0], claim, lambda: "/api/v1/source-scans/offline/"
+                )
         finally:
             close_old_connections()
 
     with ThreadPoolExecutor(max_workers=2) as pool:
         list(pool.map(lambda _: execute(), range(2)))
-    assert SystemCheck.objects.count() == 1
+    assert Job.objects.get(pk=ids[0]).status == "succeeded"
+    assert not SystemCheck.objects.exists()
 
 
 @pytest.mark.parametrize(

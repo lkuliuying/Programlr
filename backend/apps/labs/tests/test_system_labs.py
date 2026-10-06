@@ -14,13 +14,13 @@ from apps.jobs.models import Job
 from apps.jobs.retries import submit_retry
 from apps.jobs.services import reconcile_expired
 from apps.jobs.tests.test_contract import assert_response, contract_schema
-from apps.jobs.tests.test_jobs import client_with_token
+from apps.jobs.tests.test_jobs import client_with_token, create_job
 from apps.labs.models import SystemLabRun
-from apps.labs.system_adapter import execute_case
+from apps.labs.system_definition import system_definition
 from apps.labs.system_services import execute_system_run, submit_system_run
 from apps.labs.tests.test_labs import values
 from apps.learning.tests.test_learning import analysis as analysis
-from common.errors import Conflict
+from common.errors import ApiProblem
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -44,118 +44,88 @@ def test_real_observations_idempotency_and_public_contract(
         assert response.status_code == 200
         assert_response(response, schema, template)
     with patch("apps.jobs.services.app.send_task") as send:
-        response = client.post(
-            f"/api/v1/system-labs/{lab_id}/runs/",
-            data,
-            format="json",
-            HTTP_IDEMPOTENCY_KEY=key,
-        )
-        assert response.status_code == 202
-        assert_response(response, schema, "/api/v1/system-labs/{lab_id}/runs/", "post")
-        repeat = client.post(
-            f"/api/v1/system-labs/{lab_id}/runs/",
-            data,
-            format="json",
-            HTTP_IDEMPOTENCY_KEY=key,
-        )
-        assert (
-            repeat.status_code == 200
-            and repeat.json()["id"] == response.json()["id"]
-            and send.call_count == 1
-        )
-    execute_system_run(response.json()["id"])
-    run = SystemLabRun.objects.select_related("job").get(job_id=response.json()["id"])
-    assert run.job.status == "succeeded", run.job.error
-    assert run.cleanup["status"] == "completed" and len(run.observations) == 2
-    if lab_id == "container-network":
-        assert (
-            run.observations[0]["hostname"] == "localhost"
-            and not run.observations[0]["connected"]
-        )
-        assert (
-            run.observations[1]["hostname"] == "task-board-api"
-            and run.observations[1]["connected"]
-            and run.observations[1]["addresses"]
-        )
-    else:
-        assert (
-            run.observations[0]["return_code"] == 0
-            and run.observations[1]["timed_out"]
-            and run.observations[1]["reaped"]
-        )
-    original = run.observations
-    execute_system_run(str(run.job_id))
-    run.refresh_from_db()
-    assert run.observations == original
+        for _ in range(2):
+            response = client.post(
+                f"/api/v1/system-labs/{lab_id}/runs/",
+                data,
+                format="json",
+                HTTP_IDEMPOTENCY_KEY=key,
+            )
+            assert (
+                response.status_code == 410
+                and response.json()["code"] == "FEATURE_RETIRED"
+            )
+            assert_response(
+                response, schema, "/api/v1/system-labs/{lab_id}/runs/", "post"
+            )
+    send.assert_not_called()
+    assert not SystemLabRun.objects.exists()
+    job = create_job(kind="lab", status="succeeded")
+    run = SystemLabRun.objects.create(
+        job=job,
+        analysis=analysis,
+        endpoint_index=data["endpoint_index"],
+        lab_id=lab_id,
+        definition=system_definition(lab_id, analysis, data["endpoint_index"]),
+        predictions=data["predictions"],
+        cleanup={"status": "completed", "error_code": None},
+    )
+    with patch("apps.labs.system_adapter.execute_case") as execute:
+        execute_system_run(str(job.pk))
+    execute.assert_not_called()
     for url, template in [
         (f"/api/v1/system-lab-runs/{run.pk}/", "/api/v1/system-lab-runs/{run_id}/"),
         (f"/api/v1/system-lab-runs/?{query}", "/api/v1/system-lab-runs/"),
     ]:
-        assert_response(client.get(url), schema, template)
+        response = client.get(url)
+        assert response.status_code == 200
+        assert_response(response, schema, template)
 
 
 def test_unavailable_partial_cleanup_failure_retry_and_expired_claim(
     analysis: Analysis,
 ) -> None:
     data = body(analysis)
-    with patch("apps.jobs.services.app.send_task"):
-        job = submit_system_run("container-network", uuid.uuid4(), data)[0]
-    real = execute_case
-
-    def unavailable(lab: str, case: str) -> dict[str, Any]:
-        result = real(lab, "first")
-        result.update(
-            case_id=case,
-            hostname="localhost" if case == "first" else "task-board-api",
-            connected=False,
-            error_code="DNS_FAILED",
-            addresses=[],
-        )
-        return result
-
-    with patch("apps.labs.system_services.execute_case", side_effect=unavailable):
+    job = create_job(kind="lab")
+    run = SystemLabRun.objects.create(
+        job=job,
+        analysis=analysis,
+        endpoint_index=data["endpoint_index"],
+        lab_id="container-network",
+        definition=system_definition(
+            "container-network", analysis, data["endpoint_index"]
+        ),
+        predictions=data["predictions"],
+        observations=[{"historical_partial": True}],
+        cleanup={"status": "unconfirmed"},
+    )
+    with patch("apps.labs.system_adapter.execute_case") as execute:
         execute_system_run(str(job.pk))
+    execute.assert_not_called()
     job.refresh_from_db()
-    run = SystemLabRun.objects.get(job=job)
-    assert job.error is not None
+    run.refresh_from_db()
     assert (
         job.status == "failed"
-        and job.error["code"] == "SYSTEM_LAB_UNAVAILABLE"
-        and len(run.observations) == 2
+        and job.error is not None
+        and job.error["code"] == "FEATURE_RETIRED"
     )
-    with patch("apps.jobs.services.app.send_task"):
-        retry = submit_retry(job, uuid.uuid4())[0]
-    new = SystemLabRun.objects.get(job=retry)
-    assert (
-        retry.previous_job_id == job.pk
-        and new.pk != run.pk
-        and new.predictions == run.predictions
-    )
-    bad = real("subprocess-lifecycle", "first")
-    bad.update(
-        reaped=False, status="unavailable", error_code="SYSTEM_LAB_CLEANUP_FAILED"
-    )
-    with patch("apps.labs.system_services.execute_case", return_value=bad):
-        execute_system_run(str(retry.pk))
-    retry.refresh_from_db()
-    new.refresh_from_db()
-    assert retry.status == "failed" and new.cleanup["status"] == "unconfirmed"
-    with patch("apps.jobs.services.app.send_task"):
-        late = submit_system_run("subprocess-lifecycle", uuid.uuid4(), data)[0]
-
-    def expire(lab: str, case: str) -> dict[str, Any]:
-        result = real(lab, case)
-        Job.objects.filter(pk=late.pk).update(
-            expires_at=timezone.now() - timedelta(seconds=1)
-        )
-        reconcile_expired()
-        return result
-
-    with patch("apps.labs.system_services.execute_case", side_effect=expire):
+    assert run.observations == [{"historical_partial": True}] and run.cleanup == {
+        "status": "unconfirmed"
+    }
+    with pytest.raises(ApiProblem) as refused:
+        submit_retry(job, uuid.uuid4())
+    assert refused.value.machine_code == "FEATURE_RETIRED"
+    assert not Job.objects.filter(previous_job=job).exists()
+    late = create_job(kind="lab", expires_at=timezone.now() - timedelta(seconds=1))
+    reconcile_expired()
+    with patch("apps.labs.system_adapter.execute_case") as execute:
         execute_system_run(str(late.pk))
+    execute.assert_not_called()
     late.refresh_from_db()
     assert (
-        late.status == "failed" and not SystemLabRun.objects.get(job=late).observations
+        late.status == "failed"
+        and late.error is not None
+        and late.error["code"] == "QUEUE_TIMEOUT"
     )
 
 
@@ -163,45 +133,36 @@ def test_concurrent_submission_queue_failure_and_strict_inputs(
     analysis: Analysis,
 ) -> None:
     data, key = body(analysis), uuid.uuid4()
+    before = Job.objects.count()
 
     def submit(_: int) -> str:
         close_old_connections()
         try:
-            return str(submit_system_run("subprocess-lifecycle", key, data)[0].pk)
+            with pytest.raises(ApiProblem) as refused:
+                submit_system_run("subprocess-lifecycle", key, data)
+            return refused.value.machine_code
         finally:
             close_old_connections()
 
-    with patch("apps.jobs.services.app.send_task") as send:
+    with patch(
+        "apps.jobs.services.app.send_task", side_effect=OperationalError
+    ) as send:
         with ThreadPoolExecutor(max_workers=4) as pool:
-            identifiers = list(pool.map(submit, range(4)))
-    assert len(set(identifiers)) == 1 and send.call_count == 1
-    with pytest.raises(Conflict):
-        submit_system_run(
-            "subprocess-lifecycle",
-            key,
-            {**data, "predictions": {"first": False, "second": False}},
-        )
-    with patch("apps.jobs.services.app.send_task", side_effect=OperationalError):
-        failed, _, published = submit_system_run(
-            "subprocess-lifecycle", uuid.uuid4(), data
-        )
-    assert (
-        not published
-        and failed.status == "failed"
-        and SystemLabRun.objects.filter(job=failed).exists()
-    )
+            assert list(pool.map(submit, range(4))) == ["FEATURE_RETIRED"] * 4
+    send.assert_not_called()
+    assert Job.objects.count() == before and not SystemLabRun.objects.exists()
     client = client_with_token()
     for change in (
         {"command": "arbitrary"},
         {"predictions": {"first": "yes", "second": False}},
         {"endpoint_index": -1},
     ):
+        response = client.post(
+            "/api/v1/system-labs/subprocess-lifecycle/runs/",
+            {**data, **change},
+            format="json",
+            HTTP_IDEMPOTENCY_KEY=str(uuid.uuid4()),
+        )
         assert (
-            client.post(
-                "/api/v1/system-labs/subprocess-lifecycle/runs/",
-                {**data, **change},
-                format="json",
-                HTTP_IDEMPOTENCY_KEY=str(uuid.uuid4()),
-            ).status_code
-            == 400
+            response.status_code == 410 and response.json()["code"] == "FEATURE_RETIRED"
         )

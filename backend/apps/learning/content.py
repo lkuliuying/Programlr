@@ -8,8 +8,7 @@ from django.db import transaction
 from jsonschema import Draft202012Validator  # type: ignore[import-untyped]
 from jsonschema.exceptions import ValidationError  # type: ignore[import-untyped]
 
-from apps.learning.models import Exercise, KnowledgeCard, TeachingExample
-from common.errors import ApiProblem
+from apps.learning.models import KnowledgeCard
 
 CONTENT_ROOT = Path(__file__).resolve().parents[3] / "content"
 TEXT = {"type": "string", "minLength": 1, "maxLength": 8000}
@@ -121,18 +120,19 @@ def read_content(path: Path, schema: dict[str, Any]) -> Any:
 
 
 def load_content(root: Path = CONTENT_ROOT) -> tuple[int, int]:
-    from apps.learning.services import validate_answer
+    """兼容旧导入名，只发布知识卡片，不再发布退役内容。"""
+    return load_cards_only(root), 0
 
+
+def load_cards_only(root: Path = CONTENT_ROOT) -> int:
+    """发布可信知识卡片，不创建课程、进度、练习或实验记录。"""
     cards: list[dict[str, Any]] = []
-    bundles = []
     for path in sorted((root / "knowledge").glob("*.json")):
         cards.extend(
-            read_content(path, {"type": "array", "maxItems": 30, "items": CARD})
+            read_content(path, {"type": "array", "maxItems": 100, "items": CARD})
         )
-    for path in sorted((root / "exercises").glob("*.json")):
-        bundles.append(read_content(path, BUNDLE))
-    if not cards or not bundles or len(cards) > 100 or len(bundles) > 20:
-        raise ValueError("教学内容缺失或超过限制。")
+    if not cards or len(cards) > 100:
+        raise ValueError("知识内容缺失或超过限制。")
     with transaction.atomic():
         for card in cards:
             record, _ = KnowledgeCard.objects.get_or_create(
@@ -142,58 +142,4 @@ def load_content(root: Path = CONTENT_ROOT) -> tuple[int, int]:
             )
             if record.content_digest != content_digest(card):
                 raise ValueError("知识卡片同版本内容漂移，必须发布新版本。")
-        count = 0
-        for bundle in bundles:
-            signature = {"version": bundle["example_version"], "files": bundle["files"]}
-            for path in signature["files"]:
-                if (
-                    path.startswith("/")
-                    or "\\" in path
-                    or ":" in path
-                    or any(part in {"", ".", ".."} for part in path.split("/"))
-                ):
-                    raise ValueError("示例引用路径不符合约定。")
-            example, _ = TeachingExample.objects.get_or_create(
-                version=signature["version"],
-                defaults={
-                    "files": signature["files"],
-                    "content_digest": content_digest(signature),
-                },
-            )
-            if example.content_digest != content_digest(signature):
-                raise ValueError("示例同版本摘要漂移，必须重新核对并发布新版本。")
-            for item in bundle["exercises"]:
-                if len({option["id"] for option in item["options"]}) != len(
-                    item["options"]
-                ):
-                    raise ValueError("题目选项标识重复。")
-                try:
-                    validate_answer(item["kind"], item["options"], item["answer"])
-                except ApiProblem:
-                    raise ValueError("教学答案格式无效。") from None
-                for ref in item["source_refs"]:
-                    if (
-                        ref["file_path"] not in example.files
-                        or ref["start_line"] > ref["end_line"]
-                    ):
-                        raise ValueError("教学引用未绑定示例文件。")
-                exercise, _ = Exercise.objects.get_or_create(
-                    slug=item["slug"],
-                    version=item["version"],
-                    defaults={
-                        **item,
-                        "example": example,
-                        "content_digest": content_digest(
-                            {**item, "example": example.version}
-                        ),
-                    },
-                )
-                if exercise.content_digest != content_digest(
-                    {**item, "example": example.version}
-                ):
-                    raise ValueError("题目同版本内容漂移，必须发布新版本。")
-                count += 1
-        from apps.learning.paths.publication import load_curricula
-
-        load_curricula(root)
-    return len(cards), count
+    return len(cards)

@@ -18,13 +18,14 @@ from django.test import override_settings
 from django.utils import timezone
 from kombu.exceptions import OperationalError
 
-from apps.analysis.models import Analysis, AnalysisGraph
+from apps.analysis.models import Analysis, AnalysisGraph, SourceScan
+from apps.analysis.scans import execute_source_scan, submit_source_scan
 from apps.analysis.services import execute_analysis, submit_analysis
 from apps.analysis.tests.test_analysis import imported
 from apps.jobs import services as jobs
 from apps.jobs.models import Job, SystemCheck
 from apps.jobs.retries import submit_retry
-from apps.jobs.tests.test_jobs import client_with_token, create_job
+from apps.jobs.tests.test_jobs import client_with_token, create_job, create_snapshot
 from apps.projects.models import Snapshot, SourceFile
 from apps.projects.services import (
     create_project,
@@ -67,7 +68,7 @@ def submit(kind: str, key: uuid.UUID, snapshot_id: uuid.UUID) -> Job:
         return submit_import(
             create_project(uuid.uuid4(), "恢复测试")[0], key, upload()
         )[0]
-    return jobs.submit_check(key)[0]
+    return submit_source_scan(Snapshot.objects.get(pk=snapshot_id), key)[0]
 
 
 def crash_before_dispatch(kind: str, key: uuid.UUID, snapshot_id: uuid.UUID) -> None:
@@ -93,7 +94,7 @@ def assert_history_in_process(snapshot_id: uuid.UUID, job_id: uuid.UUID) -> None
     assert client.get(detail.json()["result_url"] + "graph/").status_code == 200
 
 
-@pytest.mark.parametrize("kind", ["system_check", "import", "analysis"])
+@pytest.mark.parametrize("kind", ["source_scan", "import", "analysis"])
 def test_submit_process_death_after_commit_is_reconciled(kind: str) -> None:
     snapshot, key = imported(), uuid.uuid4()
     run_process(crash_before_dispatch, kind, key, snapshot.pk, expected=23)
@@ -109,7 +110,11 @@ def test_submit_process_death_after_commit_is_reconciled(kind: str) -> None:
     )
     for execute in (
         jobs.execute_check,
-        execute_import if kind == "import" else execute_analysis,
+        execute_import
+        if kind == "import"
+        else execute_source_scan
+        if kind == "source_scan"
+        else execute_analysis,
     ):
         execute(str(job.pk))
     assert not Analysis.objects.exists() and not SystemCheck.objects.exists()
@@ -196,16 +201,17 @@ def test_real_redis_worker_death_retry_and_restarted_reader() -> None:
             broker.default_channel.queue_delete(queue)
 
 
-@pytest.mark.parametrize("kind", ["system_check", "import", "analysis"])
+@pytest.mark.parametrize("kind", ["source_scan", "import", "analysis"])
 def test_lost_publish_ack_does_not_overwrite_success(kind: str) -> None:
     snapshot = imported()
 
     def deliver_then_fail(*args: Any, **kwargs: Any) -> None:
         execute = {
-            "system_check": jobs.execute_check,
-            "import": execute_import,
-            "analysis": execute_analysis,
-        }[kind]
+            "jobs.system_check": jobs.execute_check,
+            "projects.import": execute_import,
+            "analysis.parse": execute_analysis,
+            "analysis.source_scan": execute_source_scan,
+        }[args[0]]
         execute(kwargs["args"][0])
         raise OperationalError("untrusted diagnostic")
 
@@ -224,7 +230,7 @@ def test_lost_publish_ack_does_not_overwrite_success(kind: str) -> None:
                     {"root_urlconf": "root_urls.py"},
                 )
                 if kind == "analysis"
-                else ("/api/v1/system-checks/", {})
+                else (f"/api/v1/snapshots/{snapshot.pk}/source-scans/", {})
             )
             response = client.post(
                 path, payload, format="json", HTTP_IDEMPOTENCY_KEY=str(uuid.uuid4())
@@ -242,14 +248,24 @@ def test_lost_publish_ack_does_not_overwrite_success(kind: str) -> None:
 
 def test_result_write_crossing_deadline_rolls_back() -> None:
     claim = uuid.uuid4()
-    job = create_job(status="running", claim_id=claim)
+    snapshot = create_snapshot()
+    job = create_job(
+        kind="source_scan", snapshot_id=snapshot.pk, status="running", claim_id=claim
+    )
     before, after = job.expires_at - timedelta(seconds=1), job.expires_at
+
+    def publish() -> str:
+        scan = SourceScan.objects.create(
+            job=job, snapshot=snapshot, rule_version="deadline-fixture", result={}
+        )
+        return f"/api/v1/source-scans/{scan.pk}/"
+
     with (
         patch("apps.jobs.services.timezone.now", side_effect=[before, before, after]),
         pytest.raises(TimeoutError),
     ):
-        jobs.complete_check(str(job.pk), claim)
-    assert not SystemCheck.objects.exists()
+        jobs.complete_source_scan(str(job.pk), claim, publish)
+    assert not SourceScan.objects.exists()
     job.refresh_from_db()
     assert job.status == "running"
 
@@ -260,16 +276,16 @@ def test_check_deadline_failure_and_database_error_are_safe() -> None:
         jobs.execute_check(str(job.pk))
     job.refresh_from_db()
     assert job.status == "failed" and job.error is not None
-    assert job.error["code"] == "EXECUTION_TIMEOUT"
+    assert job.error["code"] == "FEATURE_RETIRED"
     with patch(
         "apps.jobs.services.Job.objects.filter",
         side_effect=DatabaseError("internal-diagnostic-example"),
     ):
-        with pytest.raises(RuntimeError, match="检查领取需等待期限核对"):
+        with pytest.raises(DatabaseError):
             jobs.execute_check(str(job.pk))
 
 
-@pytest.mark.parametrize("kind", ["system_check", "import", "analysis"])
+@pytest.mark.parametrize("kind", ["source_scan", "import", "analysis"])
 def test_unavailable_broker_connection_is_bounded_and_retained(kind: str) -> None:
     from celery import Celery
     from kombu import Connection
@@ -352,9 +368,9 @@ def test_reconciler_recovers_database_outage_and_is_repeatable() -> None:
 
 
 def test_additive_migration_keeps_existing_job_and_result() -> None:
-    job = create_job()
-    jobs.execute_check(str(job.pk))
-    before = Job.objects.values().get(pk=job.pk)
+    job = create_job(status="succeeded")
+    SystemCheck.objects.create(job=job)
+    before: dict[str, Any] = dict(Job.objects.values().get(pk=job.pk))
     result = SystemCheck.objects.values().get(job=job)
     target = [("jobs", "0003_job_previous_job")]
     restore_targets = MigrationExecutor(connection).loader.graph.leaf_nodes()
@@ -363,8 +379,13 @@ def test_additive_migration_keeps_existing_job_and_result() -> None:
             [("jobs", "0002_job_result_url_job_scope_job_snapshot_id_and_more")]
         )
         MigrationExecutor(connection).migrate(target)
-        assert Job.objects.values().get(pk=job.pk) == before
-        assert SystemCheck.objects.values().get(job=job) == result
+        state = MigrationExecutor(connection).loader.project_state(target).apps
+        historical = state.get_model("jobs", "Job").objects.values().get(pk=job.pk)
+        assert historical == {key: before[key] for key in historical}
+        assert (
+            state.get_model("jobs", "SystemCheck").objects.values().get(job_id=job.pk)
+            == result
+        )
     finally:
         # 回退 jobs 会连带回退依赖它的应用；恢复全部叶节点，避免污染后续测试。
         MigrationExecutor(connection).migrate(restore_targets)

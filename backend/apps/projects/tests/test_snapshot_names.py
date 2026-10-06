@@ -132,8 +132,9 @@ def test_name_migration_backfills_old_snapshot_and_can_reverse(
     )
     old = [("projects", "0001_initial")]
     current = [("projects", "0002_snapshot_name")]
+    executor = MigrationExecutor(connection)
+    restore_targets = executor.loader.graph.leaf_nodes()
     try:
-        executor = MigrationExecutor(connection)
         executor.migrate(old)
         historical = executor.loader.project_state(old).apps.get_model(
             "projects", "Snapshot"
@@ -142,14 +143,21 @@ def test_name_migration_backfills_old_snapshot_and_can_reverse(
         assert not hasattr(previous, "name")
         executor = MigrationExecutor(connection)
         executor.migrate(current)
-        snapshot.refresh_from_db()
-        assert snapshot.name == ""
+        renamed = (
+            executor.loader.project_state(current)
+            .apps.get_model("projects", "Snapshot")
+            .objects.get(pk=snapshot.pk)
+        )
+        assert renamed.name == ""
         assert (
-            snapshot.pk,
-            snapshot.project_id,
-            snapshot.job_id,
-            snapshot.manifest_digest,
+            renamed.pk,
+            renamed.project_id,
+            renamed.job_id,
+            renamed.manifest_digest,
         ) == identity
-        assert source_content(source, 1, source.line_count) == content
     finally:
-        MigrationExecutor(connection).migrate(current)
+        MigrationExecutor(connection).migrate(restore_targets)
+    snapshot.refresh_from_db()
+    assert (
+        snapshot.name == "" and source_content(source, 1, source.line_count) == content
+    )

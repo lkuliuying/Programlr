@@ -59,6 +59,16 @@ class PreviewNodeSerializer(serializers.Serializer[dict[str, Any]]):
     kind = serializers.CharField()
 
 
+class PreviewKnowledgeCardSerializer(serializers.Serializer[dict[str, Any]]):
+    card_id = serializers.UUIDField()
+    slug = serializers.CharField()
+    version = serializers.CharField()
+    content_digest = serializers.CharField()
+    title = serializers.CharField()
+    body = serializers.CharField()
+    source_refs = SourceRefSerializer(many=True)
+
+
 class ContextPreviewSerializer(serializers.Serializer[dict[str, Any]]):
     id = serializers.UUIDField()
     analysis_id = serializers.UUIDField()
@@ -73,6 +83,7 @@ class ContextPreviewSerializer(serializers.Serializer[dict[str, Any]]):
     nodes = PreviewNodeSerializer(many=True)
     omissions = serializers.ListField(child=serializers.CharField())
     context_bytes = serializers.IntegerField()
+    knowledge_cards = PreviewKnowledgeCardSerializer(many=True, default=list)
     created_at = serializers.DateTimeField()
 
 

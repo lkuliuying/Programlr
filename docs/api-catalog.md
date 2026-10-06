@@ -2,29 +2,37 @@
 
 | 项目 | 内容 |
 | --- | --- |
-| 文档版本 | v0.21 |
-| 文档状态 | 57 个工作台操作及生成契约；实际验收见所属阶段计划 |
-| 更新日期 | 2026-10-01 |
+| 文档版本 | v0.25 |
+| 文档状态 | 83 个工作台操作（含退役兼容入口）及生成契约；实际验收见所属阶段计划 |
+| 更新日期 | 2026-10-03 |
 | 适用阶段 | 产品 v0.1 至 v1.0 已实现清单；工作台 HTTP API v1 |
 | 本文职责 | API 分类、首版方法与路径、模块归属及开发任务的权威来源 |
+
+## M26 当前兼容与增量
+
+M26 是当前生效范围，M1–M25 的实现描述与验收保留为阶段历史。课程、先修路径、学习进度、固定练习、作答/自评、受控实验、快照对比、候选影响、人工关系校准、通知写入和基础检查已退役；旧业务写入口返回 `410 FEATURE_RETIRED`，历史模型、迁移和必要 GET 保留。旧队列消息及通用重试不能恢复执行。当前进度与实际证据唯一见[第四阶段计划 M26](phase-4-plan.md#m26)。
+
+当前83项HTTP操作。旧退役写契约保留operation_id和路径，标记deprecated且410，正常同源边界仍适用；旧GET保留必要历史读取，新增实例不发布课程或练习。以下旧阶段成功模式/执行说明为历史定义，不能绕过本节退役规则。
+
+API-74日志列表在原端点增加q名称搜索，API-74/75响应增加固定数字display_id；不增加端点或替换UUID详情路径。日志q匹配类型中文名称/代码、操作对象与保存的项目名称，可与四列条件组合；具体长度、数字范围和分页以API契约规范及生成类型为准。
 
 ## 1. 使用方法与边界
 
 本文确定首版端点范围和类型管理方式。[API 契约规范](api-conventions.md)统一维护响应、错误、分页、四态任务、幂等、快照与外发确认；本文引用这些规则，不另设协议。目录和命名见[项目结构](project-structure.md)，任务及验收见[阶段计划](phase-1-plan.md)和[需求文档](requirements.md)。
 
-当前 API-01 至 API-57 已实现，OpenAPI 与前端类型从实现生成；v0.1 验证见首阶段计划，v0.2 验证见[第二阶段计划](phase-2-plan.md)，v0.3 验证见[第三阶段计划](phase-3-plan.md)，用户追加的快照命名见[第四阶段计划](phase-4-plan.md#browser-comments)。业务字段、过滤参数、排序、资源就绪条件及逐项错误在下文对应接口设计中说明；Schema 从实现导出。
+当前 API-01 至 API-83 对应实现，OpenAPI 与前端类型从实现生成；v0.1 验证见首阶段计划，v0.2 验证见[第二阶段计划](phase-2-plan.md)，v0.3 验证见[第三阶段计划](phase-3-plan.md)，快照命名及 M25 首页所需搜索、通知与阅读进度的实际状态唯一见[第四阶段计划](phase-4-plan.md)。业务字段、过滤参数、排序、资源就绪条件及逐项错误在下文对应接口设计中说明；Schema 从实现导出。
 
-初始 v1.0 保持 56 个操作；用户随后明确授权新增服务端快照名称及 API-57。HTTP v1 与内容版本保持，工程回归和验收证据见[第四阶段计划](phase-4-plan.md)。
+初始 v1.0 保持 56 个操作；用户随后授权快照名称 API-57、M25 的 API-58 至 API-62。HTTP v1 与内容版本保持，工程回归和验收证据见[第四阶段计划](phase-4-plan.md)。
 
-同一路径的不同方法分开编号，当前共 57 个 HTTP 操作。API 编号用于文档追踪，`operation_id` 用于机器契约；两者保持稳定，不能因文件移动或 View 类改名而无意改变。
+同一路径的不同方法分开编号，当前共 83 个 HTTP 操作。API 编号用于文档追踪，`operation_id` 用于机器契约；两者保持稳定，不能因文件移动或 View 类改名而无意改变。
 
 ## 2. API 分类
 
 | 类型 | 形式 | 用途与边界 |
 | --- | --- | --- |
-| 同步资源接口 | REST + JSON | 查询项目、快照、分析结果、题目和记录；同步创建轻量记录 |
-| 文件上传接口 | HTTP multipart | 上传 ZIP 并提交导入任务；只有导入接口接收归档 |
-| 长任务接口 | HTTP 202 + 任务轮询 | 导入、分析、讲解、实验；成功接收不等于完成 |
+| 同步资源接口 | REST + JSON | 查询项目、快照、分析结果、知识和历史记录；同步创建轻量记录 |
+| 文件上传接口 | HTTP multipart | 上传ZIP或目录清单/文件并提交导入任务 |
+| 长任务接口 | HTTP 202 + 任务轮询 | 导入、扫描、分析、讲解、删除；成功接收不等于完成 |
 | 源码读取接口 | 受控 HTTP 读取 | 用快照和文件标识定位；内容类型及分段上限在 M2-T01 明确 |
 | 外部模型接口 | 服务端 Chat Completions | 非流式讲解；必须经过外发预览和确认 |
 | 内部解析接口 | 子进程 stdin/stdout JSON | Python Worker 调用本地 Node 程序；没有独立 HTTP 服务 |
@@ -125,7 +133,7 @@ M4-T01 先建立模型适配层，API-22 的可供用户使用的提交链在 M4
 | workbench | GET | `/api/v1/exercises/` | `exercises_list` | 必须给出 analysis_id、endpoint_index；返回该工作区的题目和适用性，不含答案 |
 | workbench | GET | `/api/v1/exercises/{exercise_id}/` | `exercises_retrieve` | 同样要求工作区参数；返回题干、提示、版本、选项和适用性 |
 | workbench | GET | `/api/v1/exercise-attempts/` | `exercise_attempts_list` | 可按 snapshot_id、analysis_id、endpoint_index 筛选；按 created_at/id 倒序分页 |
-| workbench | POST | `/api/v1/exercise-attempts/` | `exercise_attempts_create` | snapshot_id、analysis_id、endpoint_index、exercise_id、exercise_version、answer、hint_used、可选 previous_attempt_id；201 已保存的作答与固定反馈 |
+| workbench | POST | `/api/v1/exercise-attempts/` | `exercise_attempts_create` | 已退役：410 FEATURE_RETIRED，零业务写入/投递 |
 | workbench | GET | `/api/v1/exercise-attempts/{attempt_id}/` | `exercise_attempts_retrieve` | 历史题干、答案版本、用户答案、提示使用、反馈与来源 |
 
 预览绑定规范化配置、模板、完整消息及片段摘要。确认只允许一次新任务，重复消费返回 CONSENT_STALE；同键恢复已存在任务不触发重新校验或外发。提交与执行前检查配置及快照完整性，变更须重新预览。模型任务重试通过 API-17 提交新的 consent_id，内容必须与原预览相同；不改变已有三类任务的正文。MODEL_NOT_CONFIGURED、MODEL_CONFIGURATION_INVALID、CONSENT_STALE、EXERCISE_VERSION_MISMATCH、EXERCISE_NOT_APPLICABLE 使用 409；任务错误分别表达鉴权、限流、传输、超时、拒答、截断、结构及引用失败。原始供应商错误不回传。
@@ -204,7 +212,7 @@ API-36 的幂等范围为 system_checks_create，摘要为规范化空对象；�
 | workbench | GET | `/api/v1/csrf/` | `csrf_retrieve` | 无正文；200 Csrf，设置标准 Cookie | NFR-04、AT-24 |
 | workbench | GET | `/api/v1/jobs/` | `jobs_list` | page/page_size；200 JobPage | 400 参数、404 页码、503 数据库；FR-08 |
 | workbench | GET | `/api/v1/jobs/{job_id}/` | `jobs_retrieve` | UUID 路径；200 Job，即使任务已 failed | 404 资源、503 数据库；FR-08 |
-| workbench | POST | `/api/v1/system-checks/` | `system_checks_create` | 必填空 JSON 对象及写请求头；202 Job，重放 200 | 400/409/413/415/503；FR-08、AT-24 |
+| workbench | POST | `/api/v1/system-checks/` | `system_checks_create` | 已退役：410 FEATURE_RETIRED，零业务写入/投递 |
 | workbench | GET | `/api/v1/system-checks/{check_id}/` | `system_checks_retrieve` | UUID 路径；200 SystemCheck | 404 资源、503 数据库；FR-08 |
 | task-board | GET | `/api/v1/csrf/` | `task_board_csrf_retrieve` | 无正文；200 Csrf，独立 Cookie | NFR-04、AT-24 基准 |
 | task-board | GET | `/api/v1/tasks/` | `task_board_tasks_list` | page/page_size；200 TaskPage | 400 参数、404 页码、503 数据库；FR-02/03 基准 |
@@ -224,7 +232,7 @@ API-36 的 200/202 必带相对 Location；503 只有“持久化后投递失败
 
 | 服务 | 方法 | 路径 | operation_id | 输入与成功响应 | 特有错误与追踪 |
 | --- | --- | --- | --- | --- | --- |
-| workbench | GET | `/api/v1/projects/` | `projects_list` | page/page_size；200 ProjectPage，created_at/id 倒序 | 400 参数、404 页码、503 数据库 |
+| workbench | GET | `/api/v1/projects/` | `projects_list` | page/page_size、可选 q；200 ProjectPage，name 子串筛选后 created_at/id 倒序 | 400 参数、404 页码、503 数据库 |
 | workbench | POST | `/api/v1/projects/` | `projects_create` | JSON 仅含 name，字符串去首尾空白后 1–200 字符，无控制字符；201 Project，重放 200 | 400/409/413/415/503 |
 | workbench | GET | `/api/v1/projects/{project_id}/` | `projects_retrieve` | UUID；200 Project：id/name/created_at | 404 资源 |
 | workbench | POST | `/api/v1/projects/{project_id}/imports/` | `imports_create` | multipart/form-data 仅一个 archive 文件；202 Job，重放 200；Location 指向任务 | 400 INVALID_ARCHIVE/VALIDATION_ERROR、413 ARCHIVE_LIMIT_EXCEEDED、409 幂等、503 存储/投递 |
@@ -258,7 +266,7 @@ API-11 返回 `id/job_id/snapshot_id/root_urlconf/rule_version/coverage/created_
 | --- | --- | --- | --- | --- | --- |
 | workbench | POST | `/api/v1/snapshots/{snapshot_id}/analyses/` | `analyses_create` | root_urlconf；202 Job，重放 200；Location 指向原任务 | 400/403/404/409/413/415/503；FR-02、AT-04/05/06 |
 | workbench | GET | `/api/v1/analyses/{analysis_id}/` | `analyses_retrieve` | 200 Analysis；规则版本和覆盖摘要 | 404 资源、503 数据库 |
-| workbench | GET | `/api/v1/analyses/{analysis_id}/endpoints/` | `analysis_endpoints_list` | page/page_size；200 EndpointPage，path/method/view 名称稳定排序 | 400 参数、404 资源/页码 |
+| workbench | GET | `/api/v1/analyses/{analysis_id}/endpoints/` | `analysis_endpoints_list` | page/page_size、可选 q；200 EndpointPage，原索引及顺序不变，method/path 子串筛选后分页 | 400 参数、404 资源/页码 |
 | workbench | GET | `/api/v1/analyses/{analysis_id}/diagnostics/` | `analysis_diagnostics_list` | page/page_size；200 DiagnosticPage，按文件解析和路由访问顺序 | 400 参数、404 资源/页码 |
 
 路由和诊断按当前结果固定排序，不会因切换“最新快照”而变化。M2-T02 保存的分析文档与关联摘要不变，M2-T03 的独立图结果见 4.10。`coverage.complete` 仅表示本轮没有诊断；即使为 true，limitations 声明的静态范围仍生效。重复方法/路径保留多个条目并诊断，不任意选取。
@@ -313,7 +321,7 @@ Analysis.frontend 使用可空 JSON 增量迁移，保存经校验的解析文�
 | --- | --- | --- | --- | --- |
 | workbench | GET | `/api/v1/labs/` | `labs_list` | 必填 analysis_id/endpoint_index；分页返回实验与 applicable/原因 |
 | workbench | GET | `/api/v1/labs/{lab_id}/` | `labs_retrieve` | 同上；固定版本、四种输入，不含预填预测 |
-| workbench | POST | `/api/v1/labs/{lab_id}/runs/` | `lab_runs_create` | snapshot_id、analysis_id、endpoint_index、lab_version、predictions；202 lab Job，重放 200 |
+| workbench | POST | `/api/v1/labs/{lab_id}/runs/` | `lab_runs_create` | 已退役：410 FEATURE_RETIRED，零业务写入/投递 |
 | workbench | GET | `/api/v1/lab-runs/` | `lab_runs_list` | 可按 analysis_id、endpoint_index、job_id 过滤，created_at/id 倒序分页 |
 | workbench | GET | `/api/v1/lab-runs/{run_id}/` | `lab_runs_retrieve` | 成功/失败/执行中均可读取已持久化预测、观测、清理状态和嵌套任务 |
 
@@ -340,7 +348,7 @@ Analysis.frontend 使用可空 JSON 增量迁移，保存经校验的解析文�
 | 服务 | 方法 | 路径 | operation_id | 输入与结果 |
 | --- | --- | --- | --- | --- |
 | workbench | GET | `/api/v1/analyses/{analysis_id}/relation-reviews/` | `relation_reviews_list` | 必填 request_id；page/page_size；追加历史分页及当前 state |
-| workbench | POST | `/api/v1/analyses/{analysis_id}/relation-reviews/` | `relation_reviews_create` | 严格 JSON：request_id、target_id、action、expected_revision；201 新记录 / 200 幂等重放，返回 record/state |
+| workbench | POST | `/api/v1/analyses/{analysis_id}/relation-reviews/` | `relation_reviews_create` | 已退役：410 FEATURE_RETIRED，零业务写入/投递 |
 
 GET 仅接受上述查询键，request_id 必须是当前图中的前端请求；未处理的请求返回修订 0 和空历史，不创建数据库记录。历史按修订/ID 倒序，本页截止修订与 state 一致。POST 的 action 为 `confirm/exclude/reset`，expected_revision 为 0 至 2147483646 的整数，不接受布尔值或字符串。操作需要公共 Origin、CSRF 与 Idempotency-Key 保护；目标必须是该请求在原图中的 candidate_match，静态已确认关系不可人工改写。
 
@@ -352,7 +360,7 @@ GET 仅接受上述查询键，request_id 必须是当前图中的前端请求�
 
 | 服务 | 方法 | 路径 | operation_id | 输入与结果 |
 | --- | --- | --- | --- | --- |
-| workbench | POST | `/api/v1/projects/{project_id}/snapshot-comparisons/` | `project_snapshot_comparisons_create` | 两侧快照及可选成对分析；202 新任务 / 200 幂等重放 |
+| workbench | POST | `/api/v1/projects/{project_id}/snapshot-comparisons/` | `project_snapshot_comparisons_create` | 已退役：410 FEATURE_RETIRED，零业务写入/投递 |
 | workbench | GET | `/api/v1/projects/{project_id}/snapshot-comparisons/` | `project_snapshot_comparisons_list` | page/page_size；绑定、任务状态及可空摘要 |
 | workbench | GET | `/api/v1/snapshot-comparisons/{comparison_id}/` | `snapshot_comparisons_retrieve` | 摘要、两侧版本、接口/关系变化和历史引用适用性 |
 | workbench | GET | `/api/v1/snapshot-comparisons/{comparison_id}/files/` | `comparison_files_list` | page/page_size；按路径排序文件变化 |
@@ -396,10 +404,10 @@ POST 使用公共 CSRF/Origin 和幂等键，严格 JSON 的 base_snapshot_id、
 | workbench | GET | `/api/v1/knowledge-curricula/{curriculum_id}/` | `knowledge_curricula_retrieve` | UUID，已发布定义及摘要 |
 | workbench | GET | `/api/v1/learning-paths/` | `learning_paths_retrieve` | analysis_id、endpoint_index、curriculum_id、可选 goal；版本绑定的先修闭包 |
 | workbench | GET | `/api/v1/attempt-reviews/` | `attempt_reviews_list` | 必填 attempt_id，created_at/id 倒序分页 |
-| workbench | POST | `/api/v1/attempt-reviews/` | `attempt_reviews_create` | attempt_id、judgement、可选 note；201 新记录/200 重放 |
+| workbench | POST | `/api/v1/attempt-reviews/` | `attempt_reviews_create` | 已退役：410 FEATURE_RETIRED，零业务写入/投递 |
 | workbench | GET | `/api/v1/system-labs/` | `system_labs_list` | 必填 analysis_id/endpoint_index，定义分页及适用性 |
 | workbench | GET | `/api/v1/system-labs/{lab_id}/` | `system_labs_retrieve` | 固定 lab_id 与工作区参数，两个预测场景 |
-| workbench | POST | `/api/v1/system-labs/{lab_id}/runs/` | `system_lab_runs_create` | 固定版本、工作区绑定和 first/second 布尔预测；202/200 lab Job |
+| workbench | POST | `/api/v1/system-labs/{lab_id}/runs/` | `system_lab_runs_create` | 已退役：410 FEATURE_RETIRED，零业务写入/投递 |
 | workbench | GET | `/api/v1/system-lab-runs/` | `system_lab_runs_list` | analysis_id/endpoint_index/job_id 筛选，created_at/id 倒序分页 |
 | workbench | GET | `/api/v1/system-lab-runs/{run_id}/` | `system_lab_runs_retrieve` | UUID，原定义/预测、观测、清理与 Job |
 
@@ -407,11 +415,54 @@ POST 使用公共 CSRF/Origin 和幂等键，严格 JSON 的 base_snapshot_id、
 
 系统实验 definition 的两个 case_id 固定为 first/second；predictions 的两个布尔值分别预测是否连接（网络）或是否在期限内正常退出（进程）。观测逐项包含 case_id、hostname/addresses/connected、pid/return_code/stdout/timed_out/reaped、status/error_code、elapsed_ms/observed_at；不相关字段为 null 或空列表。timeout 模式的真实终止与回收属于成功观测；依赖不可用、畸形响应或清理不确认则任务失败。查询历史可按 analysis_id、endpoint_index、job_id 筛选，稳定倒序分页。新实验 Job.kind 仍为 lab，成功 result_url 为 system-lab-runs；旧 lab-runs 保留原义。所有 POST 使用现有 CSRF/Origin/幂等保护，失败通过既有 jobs 重试创建新运行。
 
+### 4.18 M26 三条主线增量
+
+- M26阶段契约共75操作，保留历史编号；新增目录导入/重试、源码扫描/读取、知识卡片/命中、接口关联图、删除预览/DELETE及日志列表/详情。
+- Job仍为queued/running/succeeded/failed，增加source_scan/delete，source_kind、parent_job_id、result_deleted_at/result_deleted。结果删除后URL为null，仅摘要可读。
+- Snapshot增加preparation_status及当前source_scan_id/scan_job_id/analysis_job_id/analysis_id。needs_root是准备状态，不是第五种Job状态；历史无准备记录返回pending而GET不补写。
+- 目录multipart的manifest为JSON文件：`{"files":[{"path":"app/views.py","index":0}]}`，files按连续index提交；只接受相对路径，来源由服务端可信入口保存，不接受用户抬高限额。
+- 删除预览含目标、范围、can_delete、接收状态、忙任务和confirmation_digest。DELETE接受该摘要，需Origin/CSRF/Idempotency-Key；202新任务/200重放，409忙或范围变化，410删除隔离。失败继续清理使用jobs重试新尝试，成功不能提前返回。
+- OperationLog独立保存UUID与名称、结果/时间、稳定错误、任务和事件；项目、operation、result、started_after/started_before筛选，时间须含时区。前置拒绝和重放追加事件；数据库不可用等未可靠记录必须明确。
+- 接口关联direction=undirected，scope明确共享符号范围；原graph方向保持。知识分页含扫描版本、coverage和diagnostics，可按scan_id/file_path或analysis_id+endpoint_index筛选。
+- 预览模板1.1.0含保留片段匹配的知识版本。旧未消费确认不能提交新讲解；旧已生成结果可读。模型预算/期限现行策略不变。
+
+| 编号 | 方法 | 路径 | 职责 | 模块 | 开发任务 | 需求 | 成功模式 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| API-63 | POST | `/api/v1/projects/{project_id}/folder-imports/` | 目录导入 | projects | M26 | FR-26 | 202新任务/200重放 |
+| API-64 | POST | `/api/v1/jobs/{job_id}/folder-retries/` | 目录导入重试 | projects/jobs | M26 | FR-26 | 202新任务/200重放 |
+| API-65 | POST | `/api/v1/snapshots/{snapshot_id}/source-scans/` | 显式源码扫描 | analysis | M26 | FR-26、FR-28 | 202新任务/200重放 |
+| API-66 | GET | `/api/v1/source-scans/{scan_id}/` | 读取持久源码扫描 | analysis | M26 | FR-26、FR-28 | 读取 |
+| API-67 | GET | `/api/v1/snapshots/{snapshot_id}/knowledge-cards/` | 扫描匹配知识卡片 | learning | M26 | FR-28 | 读取 |
+| API-68 | GET | `/api/v1/snapshots/{snapshot_id}/knowledge-hits/` | 扫描知识命中 | learning | M26 | FR-28 | 读取 |
+| API-69 | GET | `/api/v1/analyses/{analysis_id}/endpoint-relations/` | 共享源码接口关联图 | analysis | M26 | FR-27 | 读取 |
+| API-70 | GET | `/api/v1/projects/{project_id}/deletion-preview/` | 项目删除范围预览 | jobs/projects | M26 | FR-29 | 读取 |
+| API-71 | GET | `/api/v1/snapshots/{snapshot_id}/deletion-preview/` | 快照删除范围预览 | jobs/projects | M26 | FR-29 | 读取 |
+| API-72 | DELETE | `/api/v1/projects/{project_id}/` | 项目内部永久清理 | jobs/projects | M26 | FR-29 | 202新任务/200重放 |
+| API-73 | DELETE | `/api/v1/snapshots/{snapshot_id}/` | 快照内部永久清理 | jobs/projects | M26 | FR-29 | 202新任务/200重放 |
+| API-74 | GET | `/api/v1/operation-logs/` | 操作日志筛选分页 | jobs | M26 | FR-29 | 读取 |
+| API-75 | GET | `/api/v1/operation-logs/{log_id}/` | 操作日志详情与任务摘要 | jobs | M26 | FR-29 | 读取 |
+
+| 服务 | 方法 | 路径 | operation_id | 输入与结果 |
+| --- | --- | --- | --- | --- |
+| workbench | POST | `/api/v1/projects/{project_id}/folder-imports/` | `folder_imports_create` | 目录导入；字段与错误以生成Schema及M26契约为准 |
+| workbench | POST | `/api/v1/jobs/{job_id}/folder-retries/` | `folder_imports_retry` | 目录导入重试；字段与错误以生成Schema及M26契约为准 |
+| workbench | POST | `/api/v1/snapshots/{snapshot_id}/source-scans/` | `source_scans_create` | 显式源码扫描；字段与错误以生成Schema及M26契约为准 |
+| workbench | GET | `/api/v1/source-scans/{scan_id}/` | `source_scans_retrieve` | 读取持久源码扫描；字段与错误以生成Schema及M26契约为准 |
+| workbench | GET | `/api/v1/snapshots/{snapshot_id}/knowledge-cards/` | `snapshot_knowledge_cards_list` | 扫描匹配知识卡片；字段与错误以生成Schema及M26契约为准 |
+| workbench | GET | `/api/v1/snapshots/{snapshot_id}/knowledge-hits/` | `snapshot_knowledge_hits_list` | 扫描知识命中；字段与错误以生成Schema及M26契约为准 |
+| workbench | GET | `/api/v1/analyses/{analysis_id}/endpoint-relations/` | `endpoint_relations_retrieve` | 共享源码接口关联图；字段与错误以生成Schema及M26契约为准 |
+| workbench | GET | `/api/v1/projects/{project_id}/deletion-preview/` | `project_deletion_preview` | 项目删除范围预览；字段与错误以生成Schema及M26契约为准 |
+| workbench | GET | `/api/v1/snapshots/{snapshot_id}/deletion-preview/` | `snapshot_deletion_preview` | 快照删除范围预览；字段与错误以生成Schema及M26契约为准 |
+| workbench | DELETE | `/api/v1/projects/{project_id}/` | `projects_delete` | 项目内部永久清理；字段与错误以生成Schema及M26契约为准 |
+| workbench | DELETE | `/api/v1/snapshots/{snapshot_id}/` | `snapshots_delete` | 快照内部永久清理；字段与错误以生成Schema及M26契约为准 |
+| workbench | GET | `/api/v1/operation-logs/` | `operation_logs_list` | 操作日志筛选分页；字段与错误以生成Schema及M26契约为准 |
+| workbench | GET | `/api/v1/operation-logs/{log_id}/` | `operation_logs_retrieve` | 操作日志详情与任务摘要；字段与错误以生成Schema及M26契约为准 |
+
 ## 5. 编码前细化和后续扩展
 
 每个接口细化时补充：请求头及内容类型、字段/必填/范围、成功与失败示例、列表过滤和稳定排序、资源就绪条件、幂等摘要范围、快照和内容版本绑定、FR/NFR、AT 用例、`operation_id`。复用公共错误与任务格式，避免每个接口再复制整套公共规则。
 
-接口示例必须脱敏，不能使用真实凭据、绝对宿主路径或未获允许的源码。生成产物必须来自实际实现；当前包含工作台 API-01 至 API-57 及独立示例的真实 OpenAPI 和生成类型，不为后续候选接口创建占位。命令及工作目录见[后端规范](backend-guidelines.md)、[前端规范](frontend-guidelines.md)和[结构文档](project-structure.md)。
+接口示例必须脱敏，不能使用真实凭据、绝对宿主路径或未获允许的源码。生成产物必须来自实际实现；当前包含工作台 API-01 至 API-83 及独立示例的真实 OpenAPI 和生成类型，不为后续候选接口创建占位。命令及工作目录见[后端规范](backend-guidelines.md)、[前端规范](frontend-guidelines.md)和[结构文档](project-structure.md)。
 
 增加端点先判断是否能在已有资源语义内表达，并更新需求、本文、对应任务和用例。移除/改变接口需要说明消费者及兼容影响；保留旧 API 编号的历史，不把旧编号重新分配给不同操作。产品升级到 v0.2 不自动改用 `/api/v2/`，也不自动引入候选功能接口。
 
@@ -440,6 +491,58 @@ POST 使用公共 CSRF/Origin 和幂等键，严格 JSON 的 base_snapshot_id、
 
 具体字段、错误、分页与预算已按实现记录在 4.14–4.16 及后端规范；机器契约以导出 OpenAPI 为准。语义与兼容边界见 [v0.2 契约约定](api-conventions.md#v02-contract)。
 
+### 5.2 M25 搜索、通知与课程阅读进度
+
+M25 扩展既有项目和接口列表的 q，不增加搜索端点。q 为可选、单个、不超过 200 Unicode 字符的大小写不敏感子串；空串等同未筛选，不修剪或解释为正则。项目仅匹配 name，接口仅匹配 method/path；接口先建立原始 index、前端关联和人工依据，再筛选及分页，不能重新编号。统一 count 与翻页链接描述筛选结果，链接保留 q。未知、重复参数及超长输入返回 400。
+
+| 编号 | 方法 | 路径 | operation_id | 职责与成功模式 | 任务 | 需求及验收 |
+| --- | --- | --- | --- | --- | --- | --- |
+| API-58 | GET | `/api/v1/notifications/` | `notifications_list` | 派生终态任务通知，分页与未读数 | M25-T01 | M25；验证见第四阶段计划 |
+| API-59 | PATCH | `/api/v1/notifications/{job_id}/` | `notifications_mark_read` | 显式标记单条已读 | M25-T01 | M25；验证见第四阶段计划 |
+| API-60 | PATCH | `/api/v1/notification-read-state/` | `notification_read_state_update` | 单调推进全部已读时间水位 | M25-T01 | M25；验证见第四阶段计划 |
+| API-61 | GET | `/api/v1/knowledge-curricula/{curriculum_id}/progress/` | `curriculum_progress_retrieve` | 课程精确版本卡片与阅读完成标记 | M25-T01 | M25；验证见第四阶段计划 |
+| API-62 | PATCH | `/api/v1/knowledge-curricula/{curriculum_id}/progress/{card_id}/` | `curriculum_card_progress_update` | 显式更新该课程卡片的 completed | M25-T01 | M25；验证见第四阶段计划 |
+
+| 服务 | 方法 | 路径 | operation_id | 输入与成功响应 | 特有错误与追踪 |
+| --- | --- | --- | --- | --- | --- |
+| workbench | GET | `/api/v1/notifications/` | `notifications_list` | page/page_size；200 NotificationPage | 400 参数、404 页码；GET 不建已读记录 |
+| workbench | PATCH | `/api/v1/notifications/{job_id}/` | `notifications_mark_read` | 已退役：410 FEATURE_RETIRED，零业务写入/投递 |
+| workbench | PATCH | `/api/v1/notification-read-state/` | `notification_read_state_update` | 已退役：410 FEATURE_RETIRED，零业务写入/投递 |
+| workbench | GET | `/api/v1/knowledge-curricula/{curriculum_id}/progress/` | `curriculum_progress_retrieve` | 无查询参数；200 CurriculumProgress | 404 课程；409 LEARNING_CONTENT_UNAVAILABLE |
+| workbench | PATCH | `/api/v1/knowledge-curricula/{curriculum_id}/progress/{card_id}/` | `curriculum_card_progress_update` | 已退役：410 FEATURE_RETIRED，零业务写入/投递 |
+
+NotificationPage 保留 count/next/previous/results，results 为 `{job: Job, read: boolean}`，附加全量终态通知的 unread_count、服务端 as_of 及可空 read_through。仅查询 succeeded/failed，按 updated_at/id 倒序；as_of 不包含此时之后完成的任务。read 为已有单条标记或 updated_at 不晚于全局水位。单条 PATCH 返回 `{job, read:true}`；全局 PATCH 返回 `{read_through, unread_count, as_of}`。read_through 必须为带时区 ISO 8601，不能超过服务端当前时间；锁定唯一状态行后取较大值，重复或较旧请求不会重新变成未读。新完成任务不被旧水位吞掉。列表 GET 不创建任务或任何已读状态。
+
+CurriculumProgress 为 `{curriculum_id, version, completed_count, total_count, cards}`；cards 按已发布 definition.nodes 原顺序，元素为 `{card_id, slug, version, title, completed}`，按 slug/card_version 精确关联，不能跨课程或版本共享状态。没有显式记录时 completed=false；GET 不建记录、不推断理解、不暴露答案。PATCH 可标记或取消，课程行锁和课程/卡片唯一约束保护并发，返回完整进度。缺少定义绑定版本时失败封闭，不替换为其他版本。
+
+所有新 PATCH 沿用严格 JSON、Origin/X-CSRFToken、统一错误、no-store 和 X-Request-ID，不接受额外字段、查询参数或隐式布尔转换，不创建后台任务。它们为指定状态的自然幂等更新，不新增 Idempotency-Key；未知结果先读取核实，浏览器不自动重试写入。HTTP v1、任务状态、源码只读、模型确认及原有 57 项操作保持；新迁移仅创建 NotificationRead、NotificationReadState、CurriculumCardProgress，旧记录不回填、不改写。
+
+### M27 参考图重构只读接口
+
+字段与筛选、统计、导出边界见[契约规范](api-conventions.md)，保留原写入及退役规则；实际验证唯一见第四阶段计划M27。
+
+| 编号 | 方法 | 路径 | operation_id | 职责 | 任务 |
+| --- | --- | --- | --- | --- | --- |
+| API-76 | GET | `/api/v1/projects/management/` | `projects_management_list` | 项目摘要、技术筛选与稳定排序 | M27 |
+| API-77 | GET | `/api/v1/projects/activity/` | `projects_activity_retrieve` | 活动阶段与最近完成流程 | M27 |
+| API-78 | GET | `/api/v1/snapshots/` | `snapshots_search` | 跨项目快照名称搜索 | M27 |
+| API-79 | GET | `/api/v1/snapshots/{snapshot_id}/files/{file_id}/evidence/` | `snapshot_file_evidence_list` | 同快照已保存源码依据分页 | M27 |
+| API-80 | GET | `/api/v1/operation-logs/statistics/` | `operation_logs_statistics` | 全查询范围日志统计 | M27 |
+| API-81 | GET | `/api/v1/operation-logs/export/` | `operation_logs_export` | 完整筛选范围安全CSV | M27 |
+| API-82 | GET | `/api/v1/operation-logs/{log_id}/related/` | `operation_logs_related` | 直接父子任务与重试关联 | M27 |
+| API-83 | GET | `/api/v1/operation-logs/{log_id}/history/` | `operation_logs_history` | 同对象操作历史分页 | M27 |
+
+| 服务 | 方法 | 路径 | operation_id | 输入与成功响应 |
+| --- | --- | --- | --- | --- |
+| workbench | GET | `/api/v1/projects/management/` | `projects_management_list` | 项目摘要、技术筛选与稳定排序；200，GET零业务写入 |
+| workbench | GET | `/api/v1/projects/activity/` | `projects_activity_retrieve` | 活动阶段与最近完成流程；200，GET零业务写入 |
+| workbench | GET | `/api/v1/snapshots/` | `snapshots_search` | 跨项目快照名称搜索；200，GET零业务写入 |
+| workbench | GET | `/api/v1/snapshots/{snapshot_id}/files/{file_id}/evidence/` | `snapshot_file_evidence_list` | 同快照已保存源码依据分页；200，GET零业务写入 |
+| workbench | GET | `/api/v1/operation-logs/statistics/` | `operation_logs_statistics` | 全查询范围日志统计；200，GET零业务写入 |
+| workbench | GET | `/api/v1/operation-logs/export/` | `operation_logs_export` | 完整筛选范围安全CSV；200，GET零业务写入 |
+| workbench | GET | `/api/v1/operation-logs/{log_id}/related/` | `operation_logs_related` | 直接父子任务与重试关联；200，GET零业务写入 |
+| workbench | GET | `/api/v1/operation-logs/{log_id}/history/` | `operation_logs_history` | 同对象操作历史分页；200，GET零业务写入 |
+
 ## 6. 修订记录
 
 | 版本 | 日期 | 变更 | 实现状态 |
@@ -464,3 +567,9 @@ POST 使用公共 CSRF/Origin 和幂等键，严格 JSON 的 base_snapshot_id、
 | v0.19 | 2026-10-01 | 同步 v0.3 学习路径、复习和固定系统实验职责及边界 | 实际状态、证据与限制仅见第三阶段计划 |
 | v0.20 | 2026-10-01 | 同步 v1.0 保持 56 项操作和契约的工程验收入口 | 无新增 API 或字段，验证见第四阶段计划 |
 | v0.21 | 2026-10-01 | 登记用户授权的 API-57 快照命名 PATCH、字段与校验边界 | 当前工作台 57 操作；验证唯一见第四阶段计划 |
+| v0.22 | 2026-10-03 | 登记 M25 的搜索、终态通知已读水位和课程精确版本阅读进度 | 当前工作台 62 操作；实际状态与验证唯一见第四阶段计划 |
+
+| v0.23 | 2026-10-03 | API-63–75目录/扫描/知识/关联/清理/日志，明确退役写410兼容；本轮验收唯一见M26 |
+| v0.24 | 2026-10-03 | API-74/75增加display_id与日志q搜索；端点数量和UUID路径保持，验收唯一见M26 |
+
+| v0.25 | 2026-10-04 | M27登记API-76–83，新增只读项目/快照/依据/日志查询 | 实际验证唯一见第四阶段计划M27 |

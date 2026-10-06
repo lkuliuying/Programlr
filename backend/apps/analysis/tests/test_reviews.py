@@ -1,4 +1,4 @@
-"""通过实际快照、图和 PostgreSQL 事务验证人工决定及历史边界。"""
+"""验证候选决定写入退役，已存历史不改写静态图或讲解证据。"""
 
 import uuid
 from concurrent.futures import ThreadPoolExecutor
@@ -76,7 +76,7 @@ def post(
     )
 
 
-def test_decisions_history_replay_and_static_context_unchanged(
+def test_historical_decisions_readable_retired_replay_and_static_context_unchanged(
     candidate: tuple[Analysis, str, list[str]],
 ) -> None:
     analysis, request_id, targets = candidate
@@ -110,24 +110,32 @@ def test_decisions_history_replay_and_static_context_unchanged(
             index,
             key if index == 0 else None,
         )
-        assert response.status_code == 201
+        assert (
+            response.status_code == 410 and response.json()["code"] == "FEATURE_RETIRED"
+        )
         assert_response(response, schema, URL, "post")
-        state = response.json()["state"]
-        assert state["revision"] == index + 1
-        if index == 1:
-            assert state["confirmed_target_id"] == targets[1]
-            assert state["excluded_target_ids"] == []
-        if index == 2:
-            assert state["confirmed_target_id"] is None
-            assert state["excluded_target_ids"] == [targets[1]]
-        if index == 3:
-            assert (
-                state["confirmed_target_id"] is None
-                and not state["excluded_target_ids"]
-            )
+    assert (
+        not RelationReview.objects.exists() and not RelationReviewState.objects.exists()
+    )
+    RelationReviewState.objects.create(
+        analysis=analysis,
+        request_id=request_id,
+        revision=6,
+        confirmed_target_id=targets[0],
+        excluded_target_ids=[],
+    )
+    for index, (action, target) in enumerate(actions):
+        RelationReview.objects.create(
+            analysis=analysis,
+            request_id=request_id,
+            target_id=target,
+            action=action,
+            revision=index + 1,
+            idempotency_key=uuid.UUID(key) if index == 0 else uuid.uuid4(),
+            request_digest="0" * 64,
+        )
     replay = post(client, analysis, request_id, targets[0], "confirm", 0, key)
-    assert replay.status_code == 200 and replay.json()["record"]["revision"] == 1
-    assert replay.json()["state"]["revision"] == 6
+    assert replay.status_code == 410 and replay.json()["code"] == "FEATURE_RETIRED"
     assert RelationReview.objects.count() == 6
     history = client.get(path, {"request_id": request_id, "page_size": "2"})
     assert_response(history, schema, URL)
@@ -161,30 +169,26 @@ def test_decisions_history_replay_and_static_context_unchanged(
         assert build_payload(analysis, 0, None) == original_payload
 
 
-def test_revision_conflict_and_same_key_conflict(
+def test_retired_revision_and_same_key_requests_never_create_state(
     candidate: tuple[Analysis, str, list[str]],
 ) -> None:
     analysis, request_id, targets = candidate
     client, key = client_with_token(), str(uuid.uuid4())
     assert (
         post(client, analysis, request_id, targets[0], "confirm", 0, key).status_code
-        == 201
+        == 410
     )
     conflict = post(client, analysis, request_id, targets[1], "confirm", 0)
-    assert (
-        conflict.status_code == 409
-        and conflict.json()["code"] == "RELATION_REVISION_CONFLICT"
-    )
-    assert conflict.json()["details"]["current_revision"] == 1
+    assert conflict.status_code == 410 and conflict.json()["code"] == "FEATURE_RETIRED"
     changed = post(client, analysis, request_id, targets[0], "exclude", 1, key)
+    assert changed.status_code == 410 and changed.json()["code"] == "FEATURE_RETIRED"
     assert (
-        changed.status_code == 409 and changed.json()["code"] == "IDEMPOTENCY_CONFLICT"
+        not RelationReview.objects.exists() and not RelationReviewState.objects.exists()
     )
-    assert RelationReview.objects.count() == 1
 
 
 @pytest.mark.parametrize("same_key", [True, False])
-def test_concurrent_first_decisions(
+def test_concurrent_first_decisions_are_all_retired(
     candidate: tuple[Analysis, str, list[str]], same_key: bool
 ) -> None:
     analysis, request_id, targets = candidate
@@ -210,16 +214,13 @@ def test_concurrent_first_decisions(
 
     with ThreadPoolExecutor(max_workers=2) as pool:
         results = sorted(pool.map(submit, keys))
-    assert results == (
-        ["created", "replayed"]
-        if same_key
-        else ["RELATION_REVISION_CONFLICT", "created"]
+    assert results == ["FEATURE_RETIRED", "FEATURE_RETIRED"]
+    assert (
+        not RelationReview.objects.exists() and not RelationReviewState.objects.exists()
     )
-    assert RelationReview.objects.count() == 1
-    assert RelationReviewState.objects.get(analysis=analysis).revision == 1
 
 
-def test_only_original_candidate_can_be_reviewed(
+def test_retired_candidate_write_scope_and_historical_read_scope(
     candidate: tuple[Analysis, str, list[str]],
 ) -> None:
     analysis, request_id, targets = candidate
@@ -227,17 +228,22 @@ def test_only_original_candidate_can_be_reviewed(
     for target in (str(uuid.uuid4()), request_id):
         response = post(client, analysis, request_id, target, "confirm", 0)
         assert (
-            response.status_code == 409
-            and response.json()["code"] == "RELATION_NOT_CANDIDATE"
+            response.status_code == 410 and response.json()["code"] == "FEATURE_RETIRED"
         )
     assert (
         post(client, analysis, str(uuid.uuid4()), targets[0], "confirm", 0).status_code
-        == 404
+        == 410
     )
     other_job = submitted(analysis.snapshot)
     execute_analysis(str(other_job.pk))
     other = Analysis.objects.get(job=other_job)
-    assert post(client, other, request_id, targets[0], "confirm", 0).status_code == 404
+    assert post(client, other, request_id, targets[0], "confirm", 0).status_code == 410
+    assert (
+        client.get(
+            URL.format(analysis_id=other.pk), {"request_id": request_id}
+        ).status_code
+        == 404
+    )
     other_edge = next(
         edge
         for edge in query_graph(other, GraphQuery())["edges"]
@@ -247,7 +253,7 @@ def test_only_original_candidate_can_be_reviewed(
         post(
             client, analysis, request_id, other_edge["target_id"], "confirm", 0
         ).status_code
-        == 409
+        == 410
     )
     assert (
         not RelationReview.objects.exists() and not RelationReviewState.objects.exists()
@@ -275,7 +281,7 @@ def test_only_original_candidate_can_be_reviewed(
             "confirm",
             0,
         ).status_code
-        == 409
+        == 410
     )
 
 
@@ -309,7 +315,7 @@ def test_invalid_decision_input(
         format="json",
         HTTP_IDEMPOTENCY_KEY=str(uuid.uuid4()),
     )
-    assert response.status_code == 400
+    assert response.status_code == 410 and response.json()["code"] == "FEATURE_RETIRED"
     assert not RelationReviewState.objects.exists()
 
 
@@ -331,10 +337,10 @@ def test_read_query_validation_and_write_protection(
         APIClient(enforce_csrf_checks=True).post(path, {}, format="json").status_code
         == 403
     )
-    assert post(client, analysis, request_id, targets[0], "reset", 0).status_code == 201
+    assert post(client, analysis, request_id, targets[0], "reset", 0).status_code == 410
 
 
-def test_failure_rolls_back_state_and_record(
+def test_retirement_precedes_write_failure_and_corrupt_history_fails_closed(
     candidate: tuple[Analysis, str, list[str]],
 ) -> None:
     analysis, request_id, targets = candidate
@@ -342,22 +348,26 @@ def test_failure_rolls_back_state_and_record(
     with patch(
         "apps.analysis.reviews.RelationReview.objects.create",
         side_effect=DatabaseError("合成写入失败"),
-    ):
+    ) as write:
         assert (
             post(
                 client, analysis, request_id, targets[0], "confirm", 0, key
             ).status_code
-            == 503
+            == 410
         )
+        write.assert_not_called()
     assert (
         not RelationReviewState.objects.exists() and not RelationReview.objects.exists()
     )
     assert (
         post(client, analysis, request_id, targets[0], "confirm", 0, key).status_code
-        == 201
+        == 410
     )
-    RelationReviewState.objects.filter(analysis=analysis).update(
-        excluded_target_ids=["broken"]
+    RelationReviewState.objects.create(
+        analysis=analysis,
+        request_id=request_id,
+        revision=1,
+        excluded_target_ids=["broken"],
     )
     response = client.get(
         URL.format(analysis_id=analysis.pk), {"request_id": request_id}

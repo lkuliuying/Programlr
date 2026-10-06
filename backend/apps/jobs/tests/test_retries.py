@@ -15,9 +15,9 @@ from apps.analysis.models import Analysis, AnalysisGraph, AnalysisRequest
 from apps.analysis.services import execute_analysis
 from apps.analysis.tests.test_analysis import imported
 from apps.analysis.tests.test_analysis import submitted as submitted_analysis
-from apps.jobs.models import Job, SystemCheck
+from apps.jobs.models import Job
 from apps.jobs.retries import submit_retry
-from apps.jobs.services import execute_check, reconcile_expired
+from apps.jobs.services import reconcile_expired
 from apps.jobs.tests.test_contract import assert_response, contract_schema
 from apps.jobs.tests.test_jobs import client_with_token, create_job
 from apps.projects.models import ImportRequest, Snapshot, SourceFile
@@ -58,28 +58,15 @@ def test_check_retry_replay_history_and_contract() -> None:
         first = client.post(
             retry_path(previous), {}, format="json", HTTP_IDEMPOTENCY_KEY=key
         )
-        assert first.status_code == 202
+        assert first.status_code == 410
         replay = client.post(
             retry_path(previous), {}, format="json", HTTP_IDEMPOTENCY_KEY=key
         )
-    assert replay.status_code == 200 and replay.json()["id"] == first.json()["id"]
-    assert send.call_count == 1
-    assert first.json()["previous_job_id"] == str(previous.pk)
-    assert_response(first, contract_schema(), "/api/v1/jobs/{job_id}/retries/", "post")
-    execute_check(first.json()["id"])
-    connections.close_all()
-    fresh = client_with_token()
-    result = fresh.get(first["Location"]).json()
-    assert result["status"] == "succeeded"
-    assert fresh.get(result["result_url"]).json()["job_id"] == first.json()["id"]
-    assert fresh.get(f"/api/v1/jobs/{previous.pk}/").json() == before
-    assert fresh.get("/api/v1/jobs/").json()["count"] == 2
-    with patch("apps.jobs.services.app.send_task") as send:
-        replay = fresh.post(
-            retry_path(previous), {}, format="json", HTTP_IDEMPOTENCY_KEY=key
-        )
-    assert replay.json() == result
+    assert replay.status_code == 410 and replay.json()["code"] == "FEATURE_RETIRED"
     send.assert_not_called()
+    assert_response(first, contract_schema(), "/api/v1/jobs/{job_id}/retries/", "post")
+    assert client.get(f"/api/v1/jobs/{previous.pk}/").json() == before
+    assert Job.objects.count() == 1
 
 
 def test_analysis_retry_preserves_snapshot_and_root_with_new_result() -> None:
@@ -153,7 +140,7 @@ def test_import_retry_reuploads_original_and_cleans_conflicting_input() -> None:
 
 @pytest.mark.parametrize("status", ["queued", "running", "succeeded"])
 def test_non_failed_retry_rejected(status: str) -> None:
-    previous = create_job(status=status)
+    previous = create_job(kind="analysis", status=status)
     response = client_with_token().post(
         retry_path(previous), {}, format="json", HTTP_IDEMPOTENCY_KEY=str(uuid.uuid4())
     )
@@ -177,7 +164,7 @@ def test_non_failed_retry_rejected(status: str) -> None:
     ],
 )
 def test_invalid_retry_json_creates_nothing(body: str) -> None:
-    previous = fail(create_job())
+    previous = fail(create_job(kind="analysis"))
     response = client_with_token().post(
         retry_path(previous),
         body,
@@ -188,7 +175,7 @@ def test_invalid_retry_json_creates_nothing(body: str) -> None:
 
 
 def test_missing_reused_keys_unknown_kind_and_query_rejected() -> None:
-    previous, client = fail(create_job()), client_with_token()
+    previous, client = fail(create_job(kind="analysis")), client_with_token()
     for key, status in [
         (None, 400),
         ("invalid", 400),
@@ -283,7 +270,7 @@ def test_retry_source_protection_and_upload_budget() -> None:
 
 
 def test_retry_dispatch_failure_and_second_attempt_chain() -> None:
-    previous, key = fail(create_job()), uuid.uuid4()
+    previous, key = fail(submitted_analysis(imported())), uuid.uuid4()
     with patch("apps.jobs.services.app.send_task", side_effect=OSError):
         response = client_with_token().post(
             retry_path(previous), {}, format="json", HTTP_IDEMPOTENCY_KEY=str(key)
@@ -298,8 +285,8 @@ def test_retry_dispatch_failure_and_second_attempt_chain() -> None:
         send.assert_not_called()
         newest = submit_retry(child, uuid.uuid4())[0]
     assert newest.previous_job_id == child.pk and newest.pk != child.pk
-    execute_check(str(newest.pk))
-    assert SystemCheck.objects.filter(job=newest).exists()
+    execute_analysis(str(newest.pk))
+    assert Analysis.objects.filter(job=newest).exists()
     assert Job.objects.filter(status="failed").count() == 2
 
 

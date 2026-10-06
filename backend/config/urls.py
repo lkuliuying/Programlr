@@ -1,6 +1,11 @@
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.urls import include, path
 
+from apps.jobs.api.notification_views import (
+    NotificationDetailView,
+    NotificationReadStateView,
+    NotificationsView,
+)
 from apps.jobs.api.views import (
     CsrfView,
     JobDetailView,
@@ -12,6 +17,7 @@ from apps.jobs.api.views import (
 from common.errors import error_body
 
 urlpatterns = [
+    path("api/v1/", include("apps.jobs.api.operation_urls")),
     path("api/v1/", include("apps.labs.api.urls")),
     path("api/v1/", include("apps.explanations.api.urls")),
     path("api/v1/", include("apps.learning.api.urls")),
@@ -19,6 +25,9 @@ urlpatterns = [
     path("api/v1/", include("apps.projects.api.urls")),
     path("api/v1/csrf/", CsrfView.as_view()),
     path("api/v1/jobs/", JobsView.as_view()),
+    path("api/v1/notifications/", NotificationsView.as_view()),
+    path("api/v1/notifications/<uuid:job_id>/", NotificationDetailView.as_view()),
+    path("api/v1/notification-read-state/", NotificationReadStateView.as_view()),
     path("api/v1/jobs/<uuid:job_id>/", JobDetailView.as_view()),
     path("api/v1/jobs/<uuid:job_id>/retries/", JobRetriesView.as_view()),
     path("api/v1/system-checks/", SystemChecksView.as_view()),

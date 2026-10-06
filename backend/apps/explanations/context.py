@@ -12,10 +12,13 @@ from apps.explanations.configuration import (
 )
 from apps.explanations.models import ContextPreview
 from apps.explanations.validation import TEMPLATE, TEMPLATE_VERSION
+from apps.learning.knowledge import preview_cards
+from apps.learning.models import KnowledgeCard
 from apps.projects.exceptions import ImportRejected
 from apps.projects.models import SourceFile
 from apps.projects.services import source_content
 from common.errors import ApiProblem
+from common.resource_state import require_snapshot_available
 
 
 def build_payload(
@@ -24,6 +27,7 @@ def build_payload(
     node_ids: list[str] | None,
     excluded_snippets: list[str] | None = None,
 ) -> dict[str, Any]:
+    require_snapshot_available(analysis.snapshot)
     config = configuration()
     if not 0 <= endpoint_index < len(analysis.endpoints):
         raise ApiProblem(404, "RESOURCE_NOT_FOUND", "该分析中不存在所选接口。")
@@ -85,6 +89,7 @@ def build_payload(
             for edge in edges
         ],
         "snippets": snippets,
+        "knowledge_cards": [],
     }
 
     def messages() -> list[dict[str, str]]:
@@ -136,6 +141,12 @@ def build_payload(
             "CONTEXT_UNAVAILABLE",
             "当前选择没有可用源码片段，请调整节点或排除范围。",
         )
+    knowledge_cards = preview_cards(
+        analysis,
+        [item["source_ref"] for item in snippets],
+        endpoint_index=endpoint_index,
+    )
+    context["knowledge_cards"] = knowledge_cards
     return {
         "configuration": config.binding(),
         "excluded_snippets": sorted(set(excluded_snippets or [])),
@@ -145,10 +156,12 @@ def build_payload(
         "nodes": [{"id": n["id"], "name": n["name"], "kind": n["kind"]} for n in nodes],
         "omissions": sorted(set(omitted)),
         "context_bytes": len(encode(messages())),
+        "knowledge_cards": knowledge_cards,
     }
 
 
 def check_preview(preview: ContextPreview) -> ModelConfiguration:
+    require_snapshot_available(preview.snapshot)
     config = configuration()
     payload = preview.payload
     if (
@@ -184,4 +197,15 @@ def check_preview(preview: ContextPreview) -> ModelConfiguration:
             or hashlib.sha256(content.encode()).hexdigest() != item["sha256"]
         ):
             raise ApiProblem(409, "CONSENT_STALE", "预览片段已失效，未发送请求。")
+    for item in payload.get("knowledge_cards", []):
+        card = KnowledgeCard.objects.filter(
+            pk=item["card_id"], slug=item["slug"], version=item["version"]
+        ).first()
+        if (
+            card is None
+            or card.content_digest != item["content_digest"]
+            or card.body != item["body"]
+            or card.title != item["title"]
+        ):
+            raise ApiProblem(409, "CONSENT_STALE", "知识内容版本已失效，请重新预览。")
     return config

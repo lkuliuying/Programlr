@@ -5,6 +5,8 @@ import logging
 import os
 import time
 import uuid
+from collections.abc import Iterable, Iterator
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +18,12 @@ from apps.jobs import services as jobs
 from apps.jobs.models import Job
 from apps.projects.archive import inspect_archive, prepare_archive
 from apps.projects.exceptions import ImportRejected
+from apps.projects.folder import (
+    CODEC_VERSION,
+    folder_limits,
+    read_manifest,
+    write_folder_archive,
+)
 from apps.projects.models import ImportRequest, Project, Snapshot, SourceFile
 from apps.projects.storage import (
     file_lock,
@@ -29,9 +37,37 @@ from apps.projects.storage import (
     write_bytes,
     write_manifest,
 )
+from apps.projects.types import ImportLimits
 from common.errors import Conflict
+from common.resource_state import lock_project, require_snapshot_available
 
 logger = logging.getLogger(__name__)
+
+
+def request_limits(record: ImportRequest) -> ImportLimits:
+    if record.source_kind not in {"zip", "folder"}:
+        raise ImportRejected("import_policy_invalid", storage=True)
+    expected_codec = (
+        CODEC_VERSION if record.source_kind == "folder" else "zip-original/1.0.0"
+    )
+    if record.codec_version != expected_codec:
+        raise ImportRejected("import_policy_invalid", storage=True)
+    if not record.effective_limits and record.source_kind == "zip":
+        return import_limits()
+    ceiling = asdict(
+        folder_limits() if record.source_kind == "folder" else ImportLimits()
+    )
+    values = record.effective_limits
+    if (
+        not isinstance(values, dict)
+        or set(values) != set(ceiling)
+        or any(
+            type(values[name]) is not int or not 0 < values[name] <= ceiling[name]
+            for name in ceiling
+        )
+    ):
+        raise ImportRejected("import_policy_invalid", storage=True)
+    return ImportLimits(**values)
 
 
 def create_project(key: uuid.UUID, name: str) -> tuple[Project, bool]:
@@ -44,19 +80,69 @@ def create_project(key: uuid.UUID, name: str) -> tuple[Project, bool]:
 
 
 def rename_snapshot(snapshot: Snapshot, name: str) -> Snapshot:
-    snapshot.name = name
-    snapshot.save(update_fields=["name"])
+    from common.resource_state import lock_snapshot
+
+    with transaction.atomic():
+        snapshot = lock_snapshot(snapshot.pk)
+        snapshot.name = name
+        snapshot.save(update_fields=["name"])
     return snapshot
 
 
 def submit_import(
     project: Project,
     key: uuid.UUID,
-    upload: UploadedFile[Any],
+    upload: UploadedFile[Any] | None,
     *,
     previous: Job | None = None,
+    folder_files: list[UploadedFile[Any]] | None = None,
+    manifest: UploadedFile[Any] | None = None,
 ) -> tuple[Job, bool, bool]:
+    source_kind = "folder" if folder_files is not None else "zip"
+    limits = folder_limits() if source_kind == "folder" else import_limits()
+    if previous is not None:
+        prior = ImportRequest.objects.get(job=previous)
+        if prior.source_kind != source_kind:
+            raise Conflict
+        limits = request_limits(prior)
+    entries = (
+        read_manifest(manifest, folder_files)
+        if manifest is not None and folder_files is not None
+        else None
+    )
+    if (source_kind == "folder" and entries is None) or (
+        source_kind == "zip" and upload is None
+    ):
+        raise ImportRejected("import_input_missing")
     identifier = uuid.uuid4()
+    try:
+        with transaction.atomic():
+            project = lock_project(project.pk)
+            job, created = receive_import(
+                project, key, upload, identifier, limits, source_kind, entries, previous
+            )
+        # 上传锁释放且请求提交后才投递，避免快速 Worker 看不到已接收输入。
+        published = jobs.dispatch_import(job) if created else True
+        if not published:
+            with stage_lock(identifier) as failed_stage:
+                if failed_stage is not None:
+                    cleanup_stage(failed_stage)
+        job.refresh_from_db()
+        return job, created, published
+    except OSError:
+        raise ImportRejected("storage_io", storage=True) from None
+
+
+def receive_import(
+    project: Project,
+    key: uuid.UUID,
+    upload: UploadedFile[Any] | None,
+    identifier: uuid.UUID,
+    limits: ImportLimits,
+    source_kind: str,
+    entries: list[tuple[str, UploadedFile[Any]]] | None,
+    previous: Job | None,
+) -> tuple[Job, bool]:
     try:
         with stage_lock(identifier, create=True) as stage:
             if stage is None:
@@ -65,21 +151,33 @@ def submit_import(
             size = 0
             deadline = time.monotonic() + 10
             try:
-                with (stage / "archive.zip").open("xb") as target:
-                    for chunk in upload.chunks(64 * 1024):
-                        size += len(chunk)
-                        if (
-                            size > import_limits().archive_bytes
-                            or time.monotonic() > deadline
-                        ):
-                            raise ImportRejected(
-                                "archive_bytes_or_receive_timeout", limit=True
-                            )
+                if entries is not None:
+                    write_folder_archive(
+                        stage / "archive.zip", entries, deadline=deadline
+                    )
+                    with (stage / "archive.zip").open("rb") as target:
+                        os.fsync(target.fileno())
+                else:
+                    assert upload is not None
+                    with (stage / "archive.zip").open("xb") as target:
+                        for chunk in upload.chunks(64 * 1024):
+                            size += len(chunk)
+                            if (
+                                size > limits.archive_bytes
+                                or time.monotonic() > deadline
+                            ):
+                                raise ImportRejected(
+                                    "archive_bytes_or_receive_timeout", limit=True
+                                )
+                            target.write(chunk)
+                        target.flush()
+                        os.fsync(target.fileno())
+                with (stage / "archive.zip").open("rb") as received:
+                    for chunk in iter(lambda: received.read(64 * 1024), b""):
+                        if time.monotonic() > deadline:
+                            raise ImportRejected("archive_receive_timeout", limit=True)
                         digest.update(chunk)
-                        target.write(chunk)
-                    target.flush()
-                    os.fsync(target.fileno())
-                inspect_archive(stage / "archive.zip", import_limits())
+                inspect_archive(stage / "archive.zip", limits)
                 sync_directory(stage)
                 with transaction.atomic():
                     if previous is not None:
@@ -88,23 +186,26 @@ def submit_import(
                         )
                     else:
                         job, created = jobs.create_import_job(
-                            f"imports_create:{project.pk}", key, digest.hexdigest()
+                            f"{'folder_imports_create' if source_kind == 'folder' else 'imports_create'}:{project.pk}",
+                            key,
+                            digest.hexdigest(),
+                            source_kind=source_kind,
                         )
                     if created:
                         ImportRequest.objects.create(
-                            job=job, project=project, storage_id=identifier
+                            job=job,
+                            project=project,
+                            storage_id=identifier,
+                            source_kind=source_kind,
+                            effective_limits=asdict(limits),
+                            codec_version=CODEC_VERSION
+                            if source_kind == "folder"
+                            else "zip-original/1.0.0",
                         )
             finally:
                 # 数据库提交结果不确定时保留暂存，由后续扫描核对，不能误删已接收输入。
                 cleanup_stage(stage)
-        # 上传锁释放后才投递，避免快速 Worker 因锁被占用而丢失唯一执行机会。
-        published = jobs.dispatch_import(job) if created else True
-        if not published:
-            with stage_lock(identifier) as failed_stage:
-                if failed_stage is not None:
-                    cleanup_stage(failed_stage)
-        job.refresh_from_db()
-        return job, created, published
+        return job, created
     except OSError:
         raise ImportRejected("storage_io", storage=True) from None
 
@@ -156,7 +257,7 @@ def execute_import(job_id: str) -> None:
                 result = prepare_archive(
                     stage / "archive.zip",
                     prepared,
-                    import_limits(),
+                    request_limits(record),
                     write_bytes,
                     deadline=time.monotonic() + settings.JOB_EXECUTION_TIMEOUT_SECONDS,
                 )
@@ -175,6 +276,7 @@ def execute_import(job_id: str) -> None:
                 manifest_digest = write_manifest(prepared, manifest)
 
                 def publish() -> uuid.UUID:
+                    lock_project(record.project_id)
                     publish_directory(prepared, record.storage_id)
                     snapshot = Snapshot.objects.create(
                         id=record.storage_id,
@@ -189,6 +291,9 @@ def execute_import(job_id: str) -> None:
                             for item in result["files"]
                         ]
                     )
+                    from apps.analysis.scans import create_import_scan
+
+                    create_import_scan(snapshot, record.job)
                     return snapshot.pk
 
                 jobs.complete_import(job_id, claim, publish)
@@ -229,6 +334,7 @@ def execute_import(job_id: str) -> None:
 
 def validate_snapshot(snapshot: Snapshot) -> None:
     """核验发布标记，空快照也不能绕过完整性检查。"""
+    require_snapshot_available(snapshot)
     try:
         directory = storage_root() / "snapshots" / str(snapshot.pk)
         if directory.is_symlink() or not directory.is_dir():
@@ -241,8 +347,23 @@ def validate_snapshot(snapshot: Snapshot) -> None:
 
 
 def source_content(source: SourceFile, start: int, end: int) -> str:
+    validate_snapshot(source.snapshot)
+    return _read_source_content(source, start, end)
+
+
+def snapshot_contents(
+    snapshot: Snapshot, files: Iterable[SourceFile]
+) -> Iterator[tuple[SourceFile, str]]:
+    # 一次批量扫描只校验一次不可变快照标记；每个文件仍独立校验长度和摘要。
+    validate_snapshot(snapshot)
+    for source in files:
+        if source.snapshot_id != snapshot.pk:
+            raise ImportRejected("snapshot_source_mismatch", storage=True)
+        yield source, _read_source_content(source, 1, source.line_count)
+
+
+def _read_source_content(source: SourceFile, start: int, end: int) -> str:
     try:
-        validate_snapshot(source.snapshot)
         directory = storage_root() / "snapshots" / str(source.snapshot_id)
         data = read_bytes(directory / str(source.pk), source.size_bytes)
         if (

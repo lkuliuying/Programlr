@@ -8,6 +8,7 @@ class Project(models.Model):
     name = models.CharField(max_length=200)
     idempotency_key = models.UUIDField(unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    deletion_request_id = models.UUIDField(null=True)
 
     class Meta:
         ordering = ["-created_at", "-id"]
@@ -22,6 +23,9 @@ class ImportRequest(models.Model):
     job = models.OneToOneField("jobs.Job", on_delete=models.PROTECT, primary_key=True)
     project = models.ForeignKey(Project, on_delete=models.PROTECT)
     storage_id = models.UUIDField(unique=True)
+    source_kind = models.CharField(max_length=12, default="zip")
+    effective_limits = models.JSONField(default=dict)
+    codec_version = models.CharField(max_length=40, default="zip-original/1.0.0")
 
 
 class Snapshot(models.Model):
@@ -32,6 +36,7 @@ class Snapshot(models.Model):
     summary = models.JSONField()
     manifest_digest = models.CharField(max_length=64)
     created_at = models.DateTimeField(auto_now_add=True)
+    deletion_request_id = models.UUIDField(null=True)
 
     class Meta:
         ordering = ["-created_at", "-id"]

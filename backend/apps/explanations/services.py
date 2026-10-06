@@ -18,12 +18,15 @@ from apps.explanations.models import (
 )
 from apps.explanations.validation import validate_content
 from apps.jobs import services as jobs
+from apps.jobs.audit import attach_job
 from apps.jobs.models import Job
 from common.errors import ApiProblem, Conflict
+from common.resource_state import lock_snapshot, require_snapshot_available
 
 logger = logging.getLogger(__name__)
 
 
+@transaction.atomic
 def create_preview(
     key: uuid.UUID,
     analysis_id: uuid.UUID,
@@ -31,6 +34,8 @@ def create_preview(
     node_ids: list[str] | None,
     excluded_snippets: list[str] | None = None,
 ) -> tuple[ContextPreview, bool]:
+    analysis = get_object_or_404(Analysis, pk=analysis_id)
+    lock_snapshot(analysis.snapshot_id)
     request_digest = digest(
         {
             "analysis_id": str(analysis_id),
@@ -44,7 +49,6 @@ def create_preview(
         if previous.request_digest != request_digest:
             raise Conflict
         return previous, False
-    analysis = get_object_or_404(Analysis, pk=analysis_id)
     payload = build_payload(analysis, endpoint_index, node_ids, excluded_snippets)
     preview, created = ContextPreview.objects.get_or_create(
         idempotency_key=key,
@@ -62,9 +66,11 @@ def create_preview(
     return preview, created
 
 
+@transaction.atomic
 def create_consent(
     preview: ContextPreview, key: uuid.UUID
 ) -> tuple[ContextConsent, bool]:
+    lock_snapshot(preview.snapshot_id)
     previous = ContextConsent.objects.filter(
         preview=preview, idempotency_key=key
     ).first()
@@ -80,10 +86,15 @@ def submit_explanation(
     scope = f"jobs_retry:{previous.pk}" if previous else "explanations_create"
     request_digest = digest({"consent_id": str(consent_id)})
     with transaction.atomic():
+        initial = get_object_or_404(
+            ContextConsent.objects.select_related("preview"), pk=consent_id
+        )
+        lock_snapshot(initial.preview.snapshot_id)
         replay = Job.objects.filter(scope=scope, idempotency_key=key).first()
         if replay is not None:
             if replay.request_digest != request_digest or replay.kind != "explanation":
                 raise Conflict
+            attach_job(replay, False)
             return replay, False, True
         consent = get_object_or_404(
             ContextConsent.objects.select_for_update(), pk=consent_id
@@ -93,6 +104,7 @@ def submit_explanation(
         if replay is not None:
             if replay.request_digest != request_digest or replay.kind != "explanation":
                 raise Conflict
+            attach_job(replay, False)
             return replay, False, True
         preview = consent.preview
         if ExplanationRequest.objects.filter(consent=consent).exists():
@@ -168,6 +180,7 @@ def execute_explanation(job_id: str) -> None:
 
 
 def preview_data(preview: ContextPreview) -> dict[str, Any]:
+    require_snapshot_available(preview.snapshot)
     return {
         "id": preview.pk,
         "analysis_id": preview.analysis_id,

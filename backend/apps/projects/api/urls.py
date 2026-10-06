@@ -1,5 +1,12 @@
 from django.urls import path
 
+from apps.projects.api.folder_views import FolderImportsView, FolderRetriesView
+from apps.projects.api.management_views import (
+    ProjectActivityView,
+    ProjectManagementView,
+    SnapshotSearchView,
+)
+from apps.projects.api.source_evidence_views import SourceEvidenceView
 from apps.projects.api.views import (
     ImportsView,
     ProjectDetailView,
@@ -11,12 +18,21 @@ from apps.projects.api.views import (
 )
 
 urlpatterns = [
+    path("projects/management/", ProjectManagementView.as_view()),
+    path("projects/activity/", ProjectActivityView.as_view()),
+    path("snapshots/", SnapshotSearchView.as_view()),
+    path("projects/<uuid:project_id>/folder-imports/", FolderImportsView.as_view()),
+    path("jobs/<uuid:job_id>/folder-retries/", FolderRetriesView.as_view()),
     path("projects/", ProjectsView.as_view()),
     path("projects/<uuid:project_id>/", ProjectDetailView.as_view()),
     path("projects/<uuid:project_id>/imports/", ImportsView.as_view()),
     path("projects/<uuid:project_id>/snapshots/", SnapshotsView.as_view()),
     path("snapshots/<uuid:snapshot_id>/", SnapshotDetailView.as_view()),
     path("snapshots/<uuid:snapshot_id>/files/", SourceFilesView.as_view()),
+    path(
+        "snapshots/<uuid:snapshot_id>/files/<uuid:file_id>/evidence/",
+        SourceEvidenceView.as_view(),
+    ),
     path(
         "snapshots/<uuid:snapshot_id>/files/<uuid:file_id>/content/",
         SourceContentView.as_view(),

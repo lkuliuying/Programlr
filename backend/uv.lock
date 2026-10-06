@@ -430,6 +430,7 @@ dependencies = [
     { name = "drf-spectacular" },
     { name = "gunicorn" },
     { name = "jsonschema" },
+    { name = "packaging" },
     { name = "psycopg", extra = ["binary"] },
 ]
 
@@ -451,6 +452,7 @@ requires-dist = [
     { name = "drf-spectacular", specifier = "==0.30.0" },
     { name = "gunicorn", specifier = "==26.2.0" },
     { name = "jsonschema", specifier = "==4.26.0" },
+    { name = "packaging", specifier = "==26.3" },
     { name = "psycopg", extras = ["binary"], specifier = "==3.3.6" },
 ]
 

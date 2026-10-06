@@ -1,0 +1,170 @@
+[
+  {
+    "slug": "python-decorators",
+    "version": "1.1.0",
+    "title": "Python 装饰器",
+    "body": "装饰器在函数或类定义时应用包装逻辑。@ 后面的表达式不等于已经确认的业务调用链；参数、包装结果与运行效果仍需阅读定义和使用位置。",
+    "applicability": "命中源码中的装饰器 AST 节点。",
+    "review_note": "本轮依据官方文档编写并与源码静态规则核对，不代表独立人工审阅或运行验证。来源：https://docs.python.org/3.13/reference/compound_stmts.html"
+  },
+  {
+    "slug": "python-context-managers",
+    "version": "1.1.0",
+    "title": "上下文管理器：with",
+    "body": "with 使用上下文管理协议组织进入、退出和资源清理。async with 使用异步协议。退出时是否吞掉异常取决于管理器实现，不能仅凭语法保证资源或事务处理正确。",
+    "applicability": "命中 with 或 async with。",
+    "review_note": "本轮依据官方文档编写并与源码静态规则核对，不代表独立人工审阅或运行验证。来源：https://docs.python.org/3.13/reference/compound_stmts.html"
+  },
+  {
+    "slug": "python-comprehensions",
+    "version": "1.1.0",
+    "title": "列表、集合与字典推导式",
+    "body": "推导式把遍历、条件和结果表达式放在同一语法结构中。列表、集合和字典推导式构建相应容器；较大输入的内存占用与嵌套遍历成本需要结合实际数据判断。",
+    "applicability": "命中列表、集合或字典推导式。",
+    "review_note": "本轮依据官方文档编写并与源码静态规则核对，不代表独立人工审阅或运行验证。来源：https://docs.python.org/3.13/reference/expressions.html"
+  },
+  {
+    "slug": "python-generators",
+    "version": "1.1.0",
+    "title": "生成器与 yield",
+    "body": "生成器表达式以及含 yield 的函数按迭代过程产生值。yield from 委托迭代。惰性产生值不保证零内存开销；生成器中持有的资源和异常传播仍需核对。",
+    "applicability": "命中生成器表达式、yield 或 yield from。",
+    "review_note": "本轮依据官方文档编写并与源码静态规则核对，不代表独立人工审阅或运行验证。来源：https://docs.python.org/3.13/reference/expressions.html"
+  },
+  {
+    "slug": "python-async",
+    "version": "1.1.0",
+    "title": "异步函数与 await",
+    "body": "async def 定义异步函数，await 等待可等待对象。async for 和 async with 使用异步迭代与上下文协议。异步语法不会把阻塞文件、网络或计算调用自动变成非阻塞操作。",
+    "applicability": "命中异步函数、await、async for 或 async with。",
+    "review_note": "本轮依据官方文档编写并与源码静态规则核对，不代表独立人工审阅或运行验证。来源：https://docs.python.org/3.13/reference/compound_stmts.html"
+  },
+  {
+    "slug": "python-exceptions",
+    "version": "1.1.0",
+    "title": "异常、处理与清理",
+    "body": "try 组织可能失败的操作，except 处理匹配异常，finally 安排退出时执行的清理，raise 显式抛出异常。捕获异常后继续执行必须有明确恢复策略；宽泛捕获不能作为操作成功的证明。",
+    "applicability": "命中 try、异常组处理或 raise。",
+    "review_note": "本轮依据官方文档编写并与源码静态规则核对，不代表独立人工审阅或运行验证。来源：https://docs.python.org/3.13/reference/compound_stmts.html"
+  },
+  {
+    "slug": "python-pattern-matching",
+    "version": "1.1.0",
+    "title": "结构化模式匹配：match",
+    "body": "match/case 按模式检查值的结构，可包含变量捕获和守卫条件。匹配顺序及绑定名称影响后续行为；它不是普通字符串比较的简单替代。",
+    "applicability": "命中 match AST 节点。",
+    "review_note": "本轮依据官方文档编写并与源码静态规则核对，不代表独立人工审阅或运行验证。来源：https://docs.python.org/3.13/reference/compound_stmts.html"
+  },
+  {
+    "slug": "python-type-annotations",
+    "version": "1.1.0",
+    "title": "Python 类型注解",
+    "body": "参数、返回值和变量注解描述类型意图，可供检查器和框架使用。一般类型注解不会自动执行业务输入校验；运行期读取和解释注解的行为取决于具体实现。",
+    "applicability": "命中变量、参数或返回值注解。",
+    "review_note": "本轮依据官方文档编写并与源码静态规则核对，不代表独立人工审阅或运行验证。来源：https://docs.python.org/3.13/reference/simple_stmts.html"
+  },
+  {
+    "slug": "django-framework",
+    "version": "1.1.0",
+    "title": "Django 框架",
+    "body": "Django 提供 URL 分发、视图、模型和其他应用组件。识别到导入或引用只能确认源码使用该名称；实际配置、安装版本、请求结果和部署状态不能由这一事实推导。",
+    "applicability": "静态确定的 django 导入或名称引用。",
+    "review_note": "本轮依据官方文档编写并与源码静态规则核对，不代表独立人工审阅或运行验证。来源：https://docs.djangoproject.com/en/5.2/topics/db/models/"
+  },
+  {
+    "slug": "drf-framework",
+    "version": "1.1.0",
+    "title": "Django REST framework",
+    "body": "DRF 在 Django 上提供 API 视图、序列化和请求处理组件。源码模块名 rest_framework 对应分发名 djangorestframework。具体字段、权限与动作行为应阅读当前源码及接口证据。",
+    "applicability": "静态确定的 rest_framework 导入或名称引用。",
+    "review_note": "本轮依据官方文档编写并与源码静态规则核对，不代表独立人工审阅或运行验证。来源：https://www.django-rest-framework.org/api-guide/views/"
+  },
+  {
+    "slug": "requests-client",
+    "version": "1.1.0",
+    "title": "Requests HTTP 客户端",
+    "body": "Requests 是同步 HTTP 客户端。导入或名称引用不等于已经发送请求；应核对调用、超时、状态处理和连接释放，不能从源码导入推断外部服务可用。",
+    "applicability": "静态确定的 requests 导入或名称引用。",
+    "review_note": "本轮依据官方文档编写并与源码静态规则核对，不代表独立人工审阅或运行验证。来源：https://requests.readthedocs.io/en/latest/"
+  },
+  {
+    "slug": "httpx-client",
+    "version": "1.1.0",
+    "title": "HTTPX HTTP 客户端",
+    "body": "HTTPX 提供同步与异步客户端。需要区分所用客户端类型、请求等待、超时和资源关闭。导入不能证明请求已执行，也不能确定实际服务器响应。",
+    "applicability": "静态确定的 httpx 导入或名称引用。",
+    "review_note": "本轮依据官方文档编写并与源码静态规则核对，不代表独立人工审阅或运行验证。来源：https://www.python-httpx.org/"
+  },
+  {
+    "slug": "asyncio-library",
+    "version": "1.1.0",
+    "title": "asyncio：任务与事件循环",
+    "body": "asyncio 支持协程、任务和事件循环。创建任务、等待任务和取消任务是不同动作；异常处理与资源释放需要明确安排。调用位置决定是否与已有事件循环兼容。",
+    "applicability": "标准库 asyncio 导入或名称引用。",
+    "review_note": "本轮依据官方文档编写并与源码静态规则核对，不代表独立人工审阅或运行验证。来源：https://docs.python.org/3.13/library/asyncio.html"
+  },
+  {
+    "slug": "dataclasses-library",
+    "version": "1.1.0",
+    "title": "dataclasses：数据类",
+    "body": "dataclasses 可以依据字段生成初始化等方法，减少数据对象样板代码。字段注解、默认值和可变对象仍需核对；数据类不会自动验证外部业务输入。",
+    "applicability": "标准库 dataclasses 导入或名称引用。",
+    "review_note": "本轮依据官方文档编写并与源码静态规则核对，不代表独立人工审阅或运行验证。来源：https://docs.python.org/3.13/library/dataclasses.html"
+  },
+  {
+    "slug": "contextlib-library",
+    "version": "1.1.0",
+    "title": "contextlib：上下文工具",
+    "body": "contextlib 提供构建与组合上下文管理器的工具。需要核对进入、异常退出和清理路径；使用工具名称本身不能保证异常未被吞掉或资源已经释放。",
+    "applicability": "标准库 contextlib 导入或名称引用。",
+    "review_note": "本轮依据官方文档编写并与源码静态规则核对，不代表独立人工审阅或运行验证。来源：https://docs.python.org/3.13/library/contextlib.html"
+  },
+  {
+    "slug": "functools-library",
+    "version": "1.1.0",
+    "title": "functools：函数工具",
+    "body": "functools 提供函数包装、部分参数绑定和缓存等工具。包装的名称信息、缓存键、对象引用和失效条件需要结合具体调用阅读。",
+    "applicability": "标准库 functools 导入或名称引用。",
+    "review_note": "本轮依据官方文档编写并与源码静态规则核对，不代表独立人工审阅或运行验证。来源：https://docs.python.org/3.13/library/functools.html"
+  },
+  {
+    "slug": "collections-library",
+    "version": "1.1.0",
+    "title": "collections：容器工具",
+    "body": "collections 提供计数、默认值、双端队列等容器工具。选择容器需要考虑访问方式、默认值的副作用和输入规模；不能仅凭导入判断性能表现。",
+    "applicability": "标准库 collections 导入或名称引用。",
+    "review_note": "本轮依据官方文档编写并与源码静态规则核对，不代表独立人工审阅或运行验证。来源：https://docs.python.org/3.13/library/collections.html"
+  },
+  {
+    "slug": "drf-serializers",
+    "version": "1.1.0",
+    "title": "DRF 序列化器与校验",
+    "body": "序列化器定义输入校验和输出表示。validated_data 是校验后数据；具体字段、约束和自定义校验应阅读当前类。声明序列化器不会自动证明权限或数据库并发约束正确。",
+    "applicability": "静态确定的 rest_framework.serializers API 引用。",
+    "review_note": "本轮依据官方文档编写并与源码静态规则核对，不代表独立人工审阅或运行验证。来源：https://www.django-rest-framework.org/api-guide/serializers/"
+  },
+  {
+    "slug": "drf-views",
+    "version": "1.1.0",
+    "title": "DRF API 视图与动作",
+    "body": "APIView、通用视图和 ViewSet 以不同方式组织 API 处理。Router 可以生成隐式动作；源码中的定义和框架规则需要分别核对，不能将静态动作列表当运行请求轨迹。",
+    "applicability": "静态确定的 DRF views、viewsets、generics 或 decorators API 引用。",
+    "review_note": "本轮依据官方文档编写并与源码静态规则核对，不代表独立人工审阅或运行验证。来源：https://www.django-rest-framework.org/api-guide/views/"
+  },
+  {
+    "slug": "django-orm",
+    "version": "1.1.0",
+    "title": "Django 模型与 ORM",
+    "body": "Django 模型定义字段与持久化结构。模型引用或 ORM 表达式不证明查询已经执行；数据库约束、事务边界、惰性求值和并发行为仍需阅读实际调用。",
+    "applicability": "静态确定的 django.db.models API 引用。",
+    "review_note": "本轮依据官方文档编写并与源码静态规则核对，不代表独立人工审阅或运行验证。来源：https://docs.djangoproject.com/en/5.2/topics/db/models/"
+  },
+  {
+    "slug": "django-url-routing",
+    "version": "1.1.0",
+    "title": "Django URL 分发",
+    "body": "path、re_path 和 include 组织路由及嵌套 URL 配置。实际完整路径由入口与包含关系组成；动态表达式、缺失模块及条件配置可能使静态识别不完整。",
+    "applicability": "静态确定的 django.urls.path、re_path 或 include 引用。",
+    "review_note": "本轮依据官方文档编写并与源码静态规则核对，不代表独立人工审阅或运行验证。来源：https://docs.djangoproject.com/en/5.2/topics/http/urls/"
+  }
+]

@@ -19,8 +19,9 @@ from apps.learning.api.path_serializers import (
 from apps.learning.api.views import ERRORS, PAGES
 from apps.learning.models import AttemptReview, ExerciseAttempt, KnowledgeCurriculum
 from apps.learning.paths.services import learning_path
-from apps.learning.reviews import submit_review
-from common.api import json_input, operation_key, page_response, resource_filters
+from common.api import page_response, resource_filters
+from common.resource_state import require_snapshot_available
+from common.retirement import retired_feature
 
 
 class CurriculaView(APIView):
@@ -74,7 +75,11 @@ class LearningPathView(APIView):
                 {"query": ["必须指定分析、接口及课程；不支持未知或重复参数。"]}
             )
         curriculum = get_object_or_404(KnowledgeCurriculum, pk=filters["curriculum_id"])
-        analysis = get_object_or_404(Analysis, pk=filters["analysis_id"])
+        analysis = get_object_or_404(
+            Analysis.objects.select_related("snapshot__project"),
+            pk=filters["analysis_id"],
+        )
+        require_snapshot_available(analysis.snapshot)
         result = learning_path(
             curriculum,
             analysis,
@@ -94,7 +99,11 @@ class AttemptReviewsView(APIView):
         filters = resource_filters(request, ("attempt_id",))
         if not filters:
             raise ValidationError({"attempt_id": ["必须指定原作答。"]})
-        get_object_or_404(ExerciseAttempt, pk=filters["attempt_id"])
+        attempt = get_object_or_404(
+            ExerciseAttempt.objects.select_related("snapshot__project"),
+            pk=filters["attempt_id"],
+        )
+        require_snapshot_available(attempt.snapshot)
         return page_response(
             request,
             AttemptReview.objects.filter(**filters),
@@ -104,22 +113,13 @@ class AttemptReviewsView(APIView):
 
     @extend_schema(
         operation_id="attempt_reviews_create",
+        deprecated=True,
         request=ReviewInputSerializer,
         parameters=[
             OpenApiParameter(name, str, OpenApiParameter.HEADER, required=True)
             for name in ("Idempotency-Key", "X-CSRFToken", "Origin")
         ],
-        responses={
-            200: AttemptReviewSerializer,
-            201: AttemptReviewSerializer,
-            **ERRORS,
-        },
+        responses=ERRORS,
     )
     def post(self, request: Request) -> Response:
-        record, created = submit_review(
-            operation_key(request),
-            json_input(request, ReviewInputSerializer).validated_data,
-        )
-        return Response(
-            AttemptReviewSerializer(record).data, status=201 if created else 200
-        )
+        retired_feature("review")

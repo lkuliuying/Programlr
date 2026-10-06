@@ -13,6 +13,7 @@ export type Analysis = {
   coverage: Coverage;
   frontend: FrontendSummary | null;
   readonly created_at: string;
+  readonly source_scan_id: string | null;
 };
 export type AnalysisInputRequest = {
   root_urlconf: string;
@@ -55,6 +56,7 @@ export type AttemptReviewPage = {
   previous: string | null;
   results: Array<AttemptReview>;
 };
+export type CandidateStatusEnum = 'selected' | 'needs_root' | 'no_root';
 export type CaseIdEnum = 'first' | 'second';
 export type ChangedFieldsEnum =
   'action' | 'view' | 'serializer' | 'model' | 'relations';
@@ -142,6 +144,7 @@ export type ContextPreview = {
   nodes: Array<PreviewNode>;
   omissions: Array<string>;
   context_bytes: number;
+  knowledge_cards?: Array<PreviewKnowledgeCard>;
   created_at: string;
 };
 export type Coverage = {
@@ -179,7 +182,42 @@ export type CurriculumPage = {
   previous: string | null;
   results: Array<KnowledgeCurriculum>;
 };
+export type CurriculumProgress = {
+  curriculum_id: string;
+  version: string;
+  completed_count: number;
+  total_count: number;
+  cards: Array<CurriculumProgressCard>;
+};
+export type CurriculumProgressCard = {
+  card_id: string;
+  slug: string;
+  version: string;
+  title: string;
+  completed: boolean;
+};
 export type DecisionEnum = 'confirmed' | 'excluded' | 'undecided';
+export type DeletionPreview = {
+  target_type: TargetTypeEnum;
+  target_id: string;
+  project_id: string;
+  object_name: string;
+  scope: DeletionScope;
+  confirmation_digest: string;
+  can_delete: boolean;
+  receiving: boolean;
+  busy_jobs: Array<Job>;
+};
+export type DeletionScope = {
+  snapshots: number;
+  files: number;
+  analyses: number;
+  source_scans: number;
+  explanations: number;
+  attempts: number;
+  lab_runs: number;
+  comparisons: number;
+};
 export type Diagnostic = {
   code: string;
   message: string;
@@ -192,6 +230,7 @@ export type DiagnosticPage = {
   previous: string | null;
   results: Array<Diagnostic>;
 };
+export type DirectionEnum = 'undirected';
 export type Endpoint = {
   readonly index: number;
   readonly frontend_available: boolean;
@@ -235,6 +274,7 @@ export type Evidence = {
   rule: string;
   source_ref: SourceRef | null;
 };
+export type EvidenceKindEnum = 'language' | 'declaration' | 'usage';
 export type Exercise = {
   readonly id: string;
   readonly slug: string;
@@ -334,6 +374,10 @@ export type FileSummary = {
   deleted: number;
   modified: number;
   unchanged: number;
+};
+export type FolderInputRequest = {
+  manifest: Blob | File;
+  files: Array<Blob | File>;
 };
 export type FrontendCoverage = {
   source_files: number;
@@ -483,6 +527,10 @@ export type Job = {
     [key: string]: number | null;
   } | null;
   readonly previous_job_id: string | null;
+  readonly parent_job_id: string | null;
+  readonly source_kind: string;
+  readonly result_deleted_at: string | null;
+  readonly result_deleted: boolean;
   readonly result_url: string | null;
   error: Error | null;
   readonly created_at: string;
@@ -511,6 +559,15 @@ export type KnowledgeCardPage = {
   previous: string | null;
   results: Array<KnowledgeCard>;
 };
+export type KnowledgeCoverage = {
+  python_files: number;
+  parsed_files: number;
+  syntax_failed_files: number;
+  hit_count: number;
+  package_count: number;
+  complete: boolean;
+  truncated: boolean;
+};
 export type KnowledgeCurriculum = {
   readonly id: string;
   readonly slug: string;
@@ -519,6 +576,32 @@ export type KnowledgeCurriculum = {
   definition: CurriculumDefinition;
   readonly content_digest: string;
 };
+export type KnowledgeHit = {
+  concept_key: string;
+  card_slug: string | null;
+  card_version: string | null;
+  rule_id: string;
+  source_ref: SourceRef;
+};
+export type KnowledgeHitPage = {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  scan_id: string;
+  rule_version: string;
+  results: Array<KnowledgeHit>;
+};
+export type KnowledgeHitPreview = {
+  reason: string;
+  source_ref: SourceRef;
+};
+export type KnowledgePackage = {
+  name: string;
+  kind: KnowledgePackageKindEnum;
+  distribution: string | null;
+};
+export type KnowledgePackageKindEnum =
+  'local' | 'stdlib' | 'third_party' | 'unknown';
 export type Lab = {
   id: string;
   version: string;
@@ -604,6 +687,14 @@ export type LearningPath = {
   applicable: boolean;
   applicability_reason: string;
 };
+export type MatchedKnowledgeCard = {
+  concept_key: string;
+  card: KnowledgeCard | null;
+  mapped: boolean;
+  hit_count: number;
+  hits: Array<KnowledgeHitPreview>;
+  package: KnowledgePackage | null;
+};
 export type MethodEnum =
   'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS' | 'TRACE';
 export type ModelTarget = {
@@ -618,6 +709,83 @@ export type ModelUsage = {
   prompt_tokens: number;
   completion_tokens: number;
   total_tokens: number;
+};
+export type Notification = {
+  job: Job;
+  read: boolean;
+};
+export type NotificationPage = {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: Array<Notification>;
+  unread_count: number;
+  as_of: string;
+  read_through: string | null;
+};
+export type OperationLog = {
+  readonly id: string;
+  readonly display_id: number;
+  readonly operation: string;
+  readonly result: string;
+  readonly request_id: string;
+  readonly project_id: string | null;
+  readonly project_name: string;
+  readonly snapshot_id: string | null;
+  readonly object_name: string;
+  readonly source_kind: string;
+  readonly job_id: string | null;
+  job: Job | null;
+  readonly error_code: string;
+  readonly events: Array<{
+    [key: string]: unknown;
+  }>;
+  readonly result_deleted: boolean;
+  readonly started_at: string;
+  readonly ended_at: string | null;
+  readonly created_at: string;
+  readonly updated_at: string;
+  retry_action: RetryActionEnum;
+  readonly retry_reason: string;
+  readonly project_available: boolean;
+};
+export type OperationLogPage = {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: Array<OperationLog>;
+};
+export type OperationStatistics = {
+  as_of: string;
+  count: number;
+  failed_count: number;
+  active_count: number;
+  retryable_count: number;
+  recent_success_rate: number | null;
+  previous_success_rate: number | null;
+  success_rate_change_pp: number | null;
+  recent_window: OperationWindow;
+  previous_window: OperationWindow;
+  trend: Array<OperationTrend>;
+};
+export type OperationTrend = {
+  start: string;
+  end: string;
+  count: number;
+  failed_count: number;
+};
+export type OperationWindow = {
+  start: string;
+  end: string;
+};
+export type PatchedCurriculumProgressInputRequest = {
+  completed: boolean;
+};
+export type PatchedNotificationReadInputRequest = {
+  read: boolean;
+};
+export type PatchedNotificationReadStateInputRequest = {
+  read_through: string;
 };
 export type PatchedSnapshotNameInputRequest = {
   name: string;
@@ -653,6 +821,15 @@ export type PreviewInputRequest = {
   node_ids?: Array<string>;
   excluded_snippets?: Array<string>;
 };
+export type PreviewKnowledgeCard = {
+  card_id: string;
+  slug: string;
+  version: string;
+  content_digest: string;
+  title: string;
+  body: string;
+  source_refs: Array<SourceRef>;
+};
 export type PreviewMessage = {
   role: RoleEnum;
   content: string;
@@ -673,8 +850,49 @@ export type Project = {
   readonly name: string;
   readonly created_at: string;
 };
+export type ProjectActivity = {
+  active: Array<ProjectActivityItem>;
+  recent: Array<ProjectActivityItem>;
+};
+export type ProjectActivityEvent = {
+  at: string;
+  result: string;
+  stage: string;
+  error_code: string;
+};
+export type ProjectActivityItem = {
+  project: Project;
+  snapshot: Snapshot | null;
+  status: ProjectActivityItemStatusEnum;
+  root_count: number | null;
+  endpoint_count: number | null;
+  stages: Array<ProjectActivityStage>;
+};
+export type ProjectActivityItemStatusEnum =
+  | 'importing'
+  | 'scanning'
+  | 'needs_root'
+  | 'no_root'
+  | 'analyzing'
+  | 'ready'
+  | 'failed'
+  | 'pending';
+export type ProjectActivityStage = {
+  kind: ProjectActivityStageKindEnum;
+  job: Job;
+  events: Array<ProjectActivityEvent>;
+};
+export type ProjectActivityStageKindEnum =
+  'import' | 'source_scan' | 'analysis';
 export type ProjectInputRequest = {
   name: string;
+};
+export type ProjectManagementPage = {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: Array<ProjectSummary>;
+  technologies: Array<string>;
 };
 export type ProjectPage = {
   count: number;
@@ -682,10 +900,56 @@ export type ProjectPage = {
   previous: string | null;
   results: Array<Project>;
 };
+export type ProjectSummary = {
+  project: Project;
+  snapshot_count: number;
+  latest_snapshot: Snapshot | null;
+  last_imported_at: string | null;
+  technologies: Array<ProjectTechnology>;
+  root_count: number | null;
+  root_path: string | null;
+};
+export type ProjectTechnology = {
+  name: string;
+  evidence_kind: EvidenceKindEnum;
+};
 export type ReferenceApplicability = {
   source_ref: SourceRef;
   target_ref: SourceRef | null;
   applicability: ApplicabilityEnum;
+};
+export type RelatedOperationLog = {
+  readonly id: string;
+  readonly display_id: number;
+  readonly operation: string;
+  readonly result: string;
+  readonly request_id: string;
+  readonly project_id: string | null;
+  readonly project_name: string;
+  readonly snapshot_id: string | null;
+  readonly object_name: string;
+  readonly source_kind: string;
+  readonly job_id: string | null;
+  job: Job | null;
+  readonly error_code: string;
+  readonly events: Array<{
+    [key: string]: unknown;
+  }>;
+  readonly result_deleted: boolean;
+  readonly started_at: string;
+  readonly ended_at: string | null;
+  readonly created_at: string;
+  readonly updated_at: string;
+  retry_action: RetryActionEnum;
+  readonly retry_reason: string;
+  readonly project_available: boolean;
+  readonly relation: string;
+};
+export type RelatedOperationLogPage = {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: Array<RelatedOperationLog>;
 };
 export type RelationChange = {
   relation: string;
@@ -746,15 +1010,52 @@ export type RelationReviewState = {
   confirmed_target_id: string | null;
   excluded_target_ids: Array<string>;
 };
+export type RetryActionEnum =
+  | 'none'
+  | 'direct'
+  | 'upload_zip'
+  | 'select_folder'
+  | 'reconfirm_explanation'
+  | 'continue_cleanup';
 export type ReviewInputRequest = {
   attempt_id: string;
   judgement: JudgementEnum;
   note?: string;
 };
 export type RoleEnum = 'system' | 'user';
+export type RootCandidate = {
+  file_path: string;
+  module: string;
+  reason: string;
+  source_refs: Array<SourceRef>;
+};
 export type SemanticChangeEnum =
   'added' | 'deleted' | 'modified' | 'unchanged' | 'ambiguous';
 export type SeverityEnum = 'warning';
+export type SharedGraph = {
+  analysis_id: string;
+  snapshot_id: string;
+  rule_version: string;
+  graph_version: string;
+  root_node_id: string | null;
+  endpoint_index: number | null;
+  algorithm: AlgorithmEnum;
+  nodes: Array<GraphNode>;
+  edges: Array<GraphEdge>;
+  readonly relation_reviews: Array<RelationDecision>;
+  coverage: Coverage;
+  diagnostics_url: string;
+  total_nodes: number;
+  total_edges: number;
+  returned_nodes: number;
+  returned_edges: number;
+  truncated: boolean;
+  truncation_reasons: Array<TruncationReasonsEnum>;
+  direction: DirectionEnum;
+  scope: SharedGraphScopeEnum;
+};
+export type SharedGraphScopeEnum =
+  'connected_shared_symbols' | 'all_shared_symbols';
 export type Snapshot = {
   readonly id: string;
   readonly name: string;
@@ -762,6 +1063,12 @@ export type Snapshot = {
   readonly job_id: string;
   summary: ImportSummary;
   readonly source_extensions: Array<string>;
+  readonly source_manifest_names: Array<string>;
+  readonly preparation_status: string;
+  readonly source_scan_id: string | null;
+  readonly scan_job_id: string | null;
+  readonly analysis_job_id: string | null;
+  readonly analysis_id: string | null;
   readonly created_at: string;
 };
 export type SnapshotComparison = {
@@ -783,11 +1090,31 @@ export type SnapshotComparison = {
   relations: Array<RelationChange>;
   evidence: Array<ExplanationApplicability>;
 };
+export type SnapshotKnowledgePage = {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  scan_id: string;
+  rule_version: string;
+  coverage: KnowledgeCoverage;
+  diagnostics: Array<Diagnostic>;
+  results: Array<MatchedKnowledgeCard>;
+};
 export type SnapshotPage = {
   count: number;
   next: string | null;
   previous: string | null;
   results: Array<Snapshot>;
+};
+export type SnapshotSearchPage = {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: Array<SnapshotSearchResult>;
+};
+export type SnapshotSearchResult = {
+  snapshot: Snapshot;
+  project: Project;
 };
 export type SourceContent = {
   readonly id: string;
@@ -801,6 +1128,29 @@ export type SourceContent = {
   end_line: number;
   content: string;
 };
+export type SourceEvidence = {
+  id: string;
+  kind: SourceEvidenceKindEnum;
+  label: string;
+  source_ref: SourceRef;
+  endpoint_index: number | null;
+  node_id: string | null;
+  concept_key: string | null;
+};
+export type SourceEvidenceKindEnum =
+  'interface' | 'frontend' | 'relation' | 'knowledge';
+export type SourceEvidencePage = {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: Array<SourceEvidence>;
+  snapshot_id: string;
+  file_id: string;
+  analysis_id: string | null;
+  scan_id: string | null;
+  scope: SourceEvidencePageScopeEnum;
+};
+export type SourceEvidencePageScopeEnum = 'persisted_source_evidence';
 export type SourceFile = {
   readonly id: string;
   readonly snapshot_id: string;
@@ -821,6 +1171,18 @@ export type SourceRef = {
   file_path: string;
   start_line: number;
   end_line: number;
+};
+export type SourceScan = {
+  id: string;
+  snapshot_id: string;
+  job_id: string;
+  scan_version: string;
+  candidate_status: CandidateStatusEnum;
+  selected_root: string | null;
+  root_candidates: Array<RootCandidate>;
+  knowledge: unknown;
+  diagnostics: unknown;
+  created_at: string;
 };
 export type StatusEnum = 'queued' | 'running' | 'succeeded' | 'failed';
 export type Symbol = {
@@ -914,6 +1276,7 @@ export type SystemPredictionsRequest = {
   first: boolean;
   second: boolean;
 };
+export type TargetTypeEnum = 'project' | 'snapshot';
 export type TruncationReasonsEnum = 'max_nodes' | 'max_edges';
 export type AnalysisWritable = {
   [key: string]: unknown;
@@ -945,6 +1308,17 @@ export type CurriculumPageWritable = {
   next: string | null;
   previous: string | null;
   results: Array<KnowledgeCurriculumWritable>;
+};
+export type DeletionPreviewWritable = {
+  target_type: TargetTypeEnum;
+  target_id: string;
+  project_id: string;
+  object_name: string;
+  scope: DeletionScope;
+  confirmation_digest: string;
+  can_delete: boolean;
+  receiving: boolean;
+  busy_jobs: Array<JobWritable>;
 };
 export type EndpointWritable = {
   method: MethodEnum;
@@ -1079,11 +1453,81 @@ export type LearningPathWritable = {
   applicable: boolean;
   applicability_reason: string;
 };
+export type MatchedKnowledgeCardWritable = {
+  concept_key: string;
+  card: unknown;
+  mapped: boolean;
+  hit_count: number;
+  hits: Array<KnowledgeHitPreview>;
+  package: KnowledgePackage | null;
+};
+export type NotificationWritable = {
+  job: JobWritable;
+  read: boolean;
+};
+export type NotificationPageWritable = {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: Array<NotificationWritable>;
+  unread_count: number;
+  as_of: string;
+  read_through: string | null;
+};
+export type OperationLogWritable = {
+  job: JobWritable | null;
+};
+export type OperationLogPageWritable = {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: Array<OperationLogWritable>;
+};
+export type ProjectActivityWritable = {
+  active: Array<ProjectActivityItemWritable>;
+  recent: Array<ProjectActivityItemWritable>;
+};
+export type ProjectActivityItemWritable = {
+  snapshot: SnapshotWritable | null;
+  status: ProjectActivityItemStatusEnum;
+  root_count: number | null;
+  endpoint_count: number | null;
+  stages: Array<ProjectActivityStageWritable>;
+};
+export type ProjectActivityStageWritable = {
+  kind: ProjectActivityStageKindEnum;
+  job: JobWritable;
+  events: Array<ProjectActivityEvent>;
+};
+export type ProjectManagementPageWritable = {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: Array<ProjectSummaryWritable>;
+  technologies: Array<string>;
+};
 export type ProjectPageWritable = {
   count: number;
   next: string | null;
   previous: string | null;
   results: Array<unknown>;
+};
+export type ProjectSummaryWritable = {
+  snapshot_count: number;
+  latest_snapshot: SnapshotWritable | null;
+  last_imported_at: string | null;
+  technologies: Array<ProjectTechnology>;
+  root_count: number | null;
+  root_path: string | null;
+};
+export type RelatedOperationLogWritable = {
+  job: JobWritable | null;
+};
+export type RelatedOperationLogPageWritable = {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: Array<RelatedOperationLogWritable>;
 };
 export type RelationReviewPageWritable = {
   count: number;
@@ -1095,14 +1539,54 @@ export type RelationReviewPageWritable = {
 export type RelationReviewResultWritable = {
   state: RelationReviewState;
 };
+export type SharedGraphWritable = {
+  analysis_id: string;
+  snapshot_id: string;
+  rule_version: string;
+  graph_version: string;
+  root_node_id: string | null;
+  endpoint_index: number | null;
+  algorithm: AlgorithmEnum;
+  nodes: Array<GraphNode>;
+  edges: Array<GraphEdge>;
+  coverage: Coverage;
+  diagnostics_url: string;
+  total_nodes: number;
+  total_edges: number;
+  returned_nodes: number;
+  returned_edges: number;
+  truncated: boolean;
+  truncation_reasons: Array<TruncationReasonsEnum>;
+  direction: DirectionEnum;
+  scope: SharedGraphScopeEnum;
+};
 export type SnapshotWritable = {
   [key: string]: unknown;
+};
+export type SnapshotKnowledgePageWritable = {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  scan_id: string;
+  rule_version: string;
+  coverage: KnowledgeCoverage;
+  diagnostics: Array<Diagnostic>;
+  results: Array<MatchedKnowledgeCardWritable>;
 };
 export type SnapshotPageWritable = {
   count: number;
   next: string | null;
   previous: string | null;
   results: Array<SnapshotWritable>;
+};
+export type SnapshotSearchPageWritable = {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: Array<SnapshotSearchResultWritable>;
+};
+export type SnapshotSearchResultWritable = {
+  snapshot: SnapshotWritable;
 };
 export type SourceContentWritable = {
   start_line: number;
@@ -1147,6 +1631,7 @@ export type AnalysesRetrieveErrors = {
   404: Error;
   406: Error;
   409: Error;
+  410: Error;
   413: Error;
   415: Error;
   500: Error;
@@ -1176,6 +1661,7 @@ export type AnalysisDiagnosticsListErrors = {
   404: Error;
   406: Error;
   409: Error;
+  410: Error;
   413: Error;
   415: Error;
   500: Error;
@@ -1188,6 +1674,39 @@ export type AnalysisDiagnosticsListResponses = {
 };
 export type AnalysisDiagnosticsListResponse =
   AnalysisDiagnosticsListResponses[keyof AnalysisDiagnosticsListResponses];
+export type EndpointRelationsRetrieveData = {
+  body?: never;
+  path: {
+    analysis_id: string;
+  };
+  query?: {
+    algorithm?: 'bfs' | 'dfs';
+    endpoint_index?: number;
+    max_edges?: number;
+    max_nodes?: number;
+    root_node_id?: string;
+  };
+  url: '/api/v1/analyses/{analysis_id}/endpoint-relations/';
+};
+export type EndpointRelationsRetrieveErrors = {
+  400: Error;
+  403: Error;
+  404: Error;
+  406: Error;
+  409: Error;
+  410: Error;
+  413: Error;
+  415: Error;
+  500: Error;
+  503: Error;
+};
+export type EndpointRelationsRetrieveError =
+  EndpointRelationsRetrieveErrors[keyof EndpointRelationsRetrieveErrors];
+export type EndpointRelationsRetrieveResponses = {
+  200: SharedGraph;
+};
+export type EndpointRelationsRetrieveResponse =
+  EndpointRelationsRetrieveResponses[keyof EndpointRelationsRetrieveResponses];
 export type AnalysisEndpointsListData = {
   body?: never;
   path: {
@@ -1196,6 +1715,7 @@ export type AnalysisEndpointsListData = {
   query?: {
     page?: number;
     page_size?: number;
+    q?: string;
   };
   url: '/api/v1/analyses/{analysis_id}/endpoints/';
 };
@@ -1205,6 +1725,7 @@ export type AnalysisEndpointsListErrors = {
   404: Error;
   406: Error;
   409: Error;
+  410: Error;
   413: Error;
   415: Error;
   500: Error;
@@ -1237,6 +1758,7 @@ export type AnalysisGraphRetrieveErrors = {
   404: Error;
   406: Error;
   409: Error;
+  410: Error;
   413: Error;
   415: Error;
   500: Error;
@@ -1295,6 +1817,7 @@ export type RelationReviewsListErrors = {
   404: Error;
   406: Error;
   409: Error;
+  410: Error;
   413: Error;
   415: Error;
   500: Error;
@@ -1321,24 +1844,13 @@ export type RelationReviewsCreateData = {
   url: '/api/v1/analyses/{analysis_id}/relation-reviews/';
 };
 export type RelationReviewsCreateErrors = {
-  400: Error;
   403: Error;
-  404: Error;
   406: Error;
-  409: Error;
-  413: Error;
-  415: Error;
+  410: Error;
   500: Error;
-  503: Error;
 };
 export type RelationReviewsCreateError =
   RelationReviewsCreateErrors[keyof RelationReviewsCreateErrors];
-export type RelationReviewsCreateResponses = {
-  200: RelationReviewResult;
-  201: RelationReviewResult;
-};
-export type RelationReviewsCreateResponse =
-  RelationReviewsCreateResponses[keyof RelationReviewsCreateResponses];
 export type AttemptReviewsListData = {
   body?: never;
   path?: never;
@@ -1355,6 +1867,7 @@ export type AttemptReviewsListErrors = {
   404: Error;
   406: Error;
   409: Error;
+  410: Error;
   413: Error;
   415: Error;
   500: Error;
@@ -1379,24 +1892,13 @@ export type AttemptReviewsCreateData = {
   url: '/api/v1/attempt-reviews/';
 };
 export type AttemptReviewsCreateErrors = {
-  400: Error;
   403: Error;
-  404: Error;
   406: Error;
-  409: Error;
-  413: Error;
-  415: Error;
+  410: Error;
   500: Error;
-  503: Error;
 };
 export type AttemptReviewsCreateError =
   AttemptReviewsCreateErrors[keyof AttemptReviewsCreateErrors];
-export type AttemptReviewsCreateResponses = {
-  200: AttemptReview;
-  201: AttemptReview;
-};
-export type AttemptReviewsCreateResponse =
-  AttemptReviewsCreateResponses[keyof AttemptReviewsCreateResponses];
 export type ContextPreviewsCreateData = {
   body: PreviewInputRequest;
   headers: {
@@ -1520,6 +2022,7 @@ export type ExerciseAttemptsListErrors = {
   404: Error;
   406: Error;
   409: Error;
+  410: Error;
   413: Error;
   415: Error;
   500: Error;
@@ -1544,24 +2047,13 @@ export type ExerciseAttemptsCreateData = {
   url: '/api/v1/exercise-attempts/';
 };
 export type ExerciseAttemptsCreateErrors = {
-  400: Error;
   403: Error;
-  404: Error;
   406: Error;
-  409: Error;
-  413: Error;
-  415: Error;
+  410: Error;
   500: Error;
-  503: Error;
 };
 export type ExerciseAttemptsCreateError =
   ExerciseAttemptsCreateErrors[keyof ExerciseAttemptsCreateErrors];
-export type ExerciseAttemptsCreateResponses = {
-  200: ExerciseAttempt;
-  201: ExerciseAttempt;
-};
-export type ExerciseAttemptsCreateResponse =
-  ExerciseAttemptsCreateResponses[keyof ExerciseAttemptsCreateResponses];
 export type ExerciseAttemptsRetrieveData = {
   body?: never;
   path: {
@@ -1576,6 +2068,7 @@ export type ExerciseAttemptsRetrieveErrors = {
   404: Error;
   406: Error;
   409: Error;
+  410: Error;
   413: Error;
   415: Error;
   500: Error;
@@ -1605,6 +2098,7 @@ export type ExercisesListErrors = {
   404: Error;
   406: Error;
   409: Error;
+  410: Error;
   413: Error;
   415: Error;
   500: Error;
@@ -1633,6 +2127,7 @@ export type ExercisesRetrieveErrors = {
   404: Error;
   406: Error;
   409: Error;
+  410: Error;
   413: Error;
   415: Error;
   500: Error;
@@ -1737,10 +2232,12 @@ export type JobsListData = {
   query?: {
     kind?:
       | 'analysis'
+      | 'delete'
       | 'explanation'
       | 'import'
       | 'lab'
       | 'snapshot_comparison'
+      | 'source_scan'
       | 'system_check';
     page?: number;
     page_size?: number;
@@ -1753,6 +2250,7 @@ export type JobsListErrors = {
   403: Error;
   404: Error;
   406: Error;
+  410: Error;
   500: Error;
   503: Error;
 };
@@ -1774,6 +2272,7 @@ export type JobsRetrieveErrors = {
   403: Error;
   404: Error;
   406: Error;
+  410: Error;
   500: Error;
   503: Error;
 };
@@ -1783,6 +2282,39 @@ export type JobsRetrieveResponses = {
 };
 export type JobsRetrieveResponse =
   JobsRetrieveResponses[keyof JobsRetrieveResponses];
+export type FolderImportsRetryData = {
+  body: FolderInputRequest;
+  headers: {
+    'Idempotency-Key': string;
+    Origin: string;
+    'X-CSRFToken': string;
+  };
+  path: {
+    job_id: string;
+  };
+  query?: never;
+  url: '/api/v1/jobs/{job_id}/folder-retries/';
+};
+export type FolderImportsRetryErrors = {
+  400: Error;
+  403: Error;
+  404: Error;
+  406: Error;
+  409: Error;
+  410: Error;
+  413: Error;
+  415: Error;
+  500: Error;
+  503: Error;
+};
+export type FolderImportsRetryError =
+  FolderImportsRetryErrors[keyof FolderImportsRetryErrors];
+export type FolderImportsRetryResponses = {
+  200: Job;
+  202: Job;
+};
+export type FolderImportsRetryResponse =
+  FolderImportsRetryResponses[keyof FolderImportsRetryResponses];
 export type JobsRetryData = {
   body:
     | {
@@ -1808,6 +2340,7 @@ export type JobsRetryErrors = {
   404: Error;
   406: Error;
   409: Error;
+  410: Error;
   413: Error;
   415: Error;
   500: Error;
@@ -1834,6 +2367,7 @@ export type KnowledgeCardsListErrors = {
   404: Error;
   406: Error;
   409: Error;
+  410: Error;
   413: Error;
   415: Error;
   500: Error;
@@ -1860,6 +2394,7 @@ export type KnowledgeCardsRetrieveErrors = {
   404: Error;
   406: Error;
   409: Error;
+  410: Error;
   413: Error;
   415: Error;
   500: Error;
@@ -1887,6 +2422,7 @@ export type KnowledgeCurriculaListErrors = {
   404: Error;
   406: Error;
   409: Error;
+  410: Error;
   413: Error;
   415: Error;
   500: Error;
@@ -1913,6 +2449,7 @@ export type KnowledgeCurriculaRetrieveErrors = {
   404: Error;
   406: Error;
   409: Error;
+  410: Error;
   413: Error;
   415: Error;
   500: Error;
@@ -1925,6 +2462,54 @@ export type KnowledgeCurriculaRetrieveResponses = {
 };
 export type KnowledgeCurriculaRetrieveResponse =
   KnowledgeCurriculaRetrieveResponses[keyof KnowledgeCurriculaRetrieveResponses];
+export type CurriculumProgressRetrieveData = {
+  body?: never;
+  path: {
+    curriculum_id: string;
+  };
+  query?: never;
+  url: '/api/v1/knowledge-curricula/{curriculum_id}/progress/';
+};
+export type CurriculumProgressRetrieveErrors = {
+  400: Error;
+  403: Error;
+  404: Error;
+  406: Error;
+  409: Error;
+  410: Error;
+  413: Error;
+  415: Error;
+  500: Error;
+  503: Error;
+};
+export type CurriculumProgressRetrieveError =
+  CurriculumProgressRetrieveErrors[keyof CurriculumProgressRetrieveErrors];
+export type CurriculumProgressRetrieveResponses = {
+  200: CurriculumProgress;
+};
+export type CurriculumProgressRetrieveResponse =
+  CurriculumProgressRetrieveResponses[keyof CurriculumProgressRetrieveResponses];
+export type CurriculumCardProgressUpdateData = {
+  body: PatchedCurriculumProgressInputRequest;
+  headers: {
+    Origin: string;
+    'X-CSRFToken': string;
+  };
+  path: {
+    card_id: string;
+    curriculum_id: string;
+  };
+  query?: never;
+  url: '/api/v1/knowledge-curricula/{curriculum_id}/progress/{card_id}/';
+};
+export type CurriculumCardProgressUpdateErrors = {
+  403: Error;
+  406: Error;
+  410: Error;
+  500: Error;
+};
+export type CurriculumCardProgressUpdateError =
+  CurriculumCardProgressUpdateErrors[keyof CurriculumCardProgressUpdateErrors];
 export type LabRunsListData = {
   body?: never;
   path?: never;
@@ -1943,6 +2528,7 @@ export type LabRunsListErrors = {
   404: Error;
   406: Error;
   409: Error;
+  410: Error;
   413: Error;
   415: Error;
   500: Error;
@@ -1968,6 +2554,7 @@ export type LabRunsRetrieveErrors = {
   404: Error;
   406: Error;
   409: Error;
+  410: Error;
   413: Error;
   415: Error;
   500: Error;
@@ -1997,6 +2584,7 @@ export type LabsListErrors = {
   404: Error;
   406: Error;
   409: Error;
+  410: Error;
   413: Error;
   415: Error;
   500: Error;
@@ -2024,6 +2612,7 @@ export type LabsRetrieveErrors = {
   404: Error;
   406: Error;
   409: Error;
+  410: Error;
   413: Error;
   415: Error;
   500: Error;
@@ -2049,23 +2638,12 @@ export type LabRunsCreateData = {
   url: '/api/v1/labs/{lab_id}/runs/';
 };
 export type LabRunsCreateErrors = {
-  400: Error;
   403: Error;
-  404: Error;
   406: Error;
-  409: Error;
-  413: Error;
-  415: Error;
+  410: Error;
   500: Error;
-  503: Error;
 };
 export type LabRunsCreateError = LabRunsCreateErrors[keyof LabRunsCreateErrors];
-export type LabRunsCreateResponses = {
-  200: Job;
-  202: Job;
-};
-export type LabRunsCreateResponse =
-  LabRunsCreateResponses[keyof LabRunsCreateResponses];
 export type LearningPathsRetrieveData = {
   body?: never;
   path?: never;
@@ -2083,6 +2661,7 @@ export type LearningPathsRetrieveErrors = {
   404: Error;
   406: Error;
   409: Error;
+  410: Error;
   413: Error;
   415: Error;
   500: Error;
@@ -2095,12 +2674,254 @@ export type LearningPathsRetrieveResponses = {
 };
 export type LearningPathsRetrieveResponse =
   LearningPathsRetrieveResponses[keyof LearningPathsRetrieveResponses];
+export type NotificationReadStateUpdateData = {
+  body: PatchedNotificationReadStateInputRequest;
+  headers: {
+    Origin: string;
+    'X-CSRFToken': string;
+  };
+  path?: never;
+  query?: never;
+  url: '/api/v1/notification-read-state/';
+};
+export type NotificationReadStateUpdateErrors = {
+  403: Error;
+  406: Error;
+  410: Error;
+  500: Error;
+};
+export type NotificationReadStateUpdateError =
+  NotificationReadStateUpdateErrors[keyof NotificationReadStateUpdateErrors];
+export type NotificationsListData = {
+  body?: never;
+  path?: never;
+  query?: {
+    page?: number;
+    page_size?: number;
+  };
+  url: '/api/v1/notifications/';
+};
+export type NotificationsListErrors = {
+  400: Error;
+  403: Error;
+  404: Error;
+  406: Error;
+  410: Error;
+  413: Error;
+  415: Error;
+  500: Error;
+  503: Error;
+};
+export type NotificationsListError =
+  NotificationsListErrors[keyof NotificationsListErrors];
+export type NotificationsListResponses = {
+  200: NotificationPage;
+};
+export type NotificationsListResponse =
+  NotificationsListResponses[keyof NotificationsListResponses];
+export type NotificationsMarkReadData = {
+  body: PatchedNotificationReadInputRequest;
+  headers: {
+    Origin: string;
+    'X-CSRFToken': string;
+  };
+  path: {
+    job_id: string;
+  };
+  query?: never;
+  url: '/api/v1/notifications/{job_id}/';
+};
+export type NotificationsMarkReadErrors = {
+  403: Error;
+  406: Error;
+  410: Error;
+  500: Error;
+};
+export type NotificationsMarkReadError =
+  NotificationsMarkReadErrors[keyof NotificationsMarkReadErrors];
+export type OperationLogsListData = {
+  body?: never;
+  path?: never;
+  query?: {
+    ended_after?: string;
+    ended_before?: string;
+    operation?: string;
+    ordering?: string;
+    page?: number;
+    page_size?: number;
+    project_id?: string;
+    q?: string;
+    result?: string;
+    started_after?: string;
+    started_before?: string;
+    view?: string;
+  };
+  url: '/api/v1/operation-logs/';
+};
+export type OperationLogsListErrors = {
+  400: Error;
+  403: Error;
+  404: Error;
+  406: Error;
+  500: Error;
+  503: Error;
+};
+export type OperationLogsListError =
+  OperationLogsListErrors[keyof OperationLogsListErrors];
+export type OperationLogsListResponses = {
+  200: OperationLogPage;
+};
+export type OperationLogsListResponse =
+  OperationLogsListResponses[keyof OperationLogsListResponses];
+export type OperationLogsRetrieveData = {
+  body?: never;
+  path: {
+    log_id: string;
+  };
+  query?: never;
+  url: '/api/v1/operation-logs/{log_id}/';
+};
+export type OperationLogsRetrieveErrors = {
+  400: Error;
+  403: Error;
+  404: Error;
+  406: Error;
+  500: Error;
+  503: Error;
+};
+export type OperationLogsRetrieveError =
+  OperationLogsRetrieveErrors[keyof OperationLogsRetrieveErrors];
+export type OperationLogsRetrieveResponses = {
+  200: OperationLog;
+};
+export type OperationLogsRetrieveResponse =
+  OperationLogsRetrieveResponses[keyof OperationLogsRetrieveResponses];
+export type OperationLogsHistoryData = {
+  body?: never;
+  path: {
+    log_id: string;
+  };
+  query?: {
+    page?: number;
+    page_size?: number;
+  };
+  url: '/api/v1/operation-logs/{log_id}/history/';
+};
+export type OperationLogsHistoryErrors = {
+  400: Error;
+  403: Error;
+  404: Error;
+  406: Error;
+  500: Error;
+  503: Error;
+};
+export type OperationLogsHistoryError =
+  OperationLogsHistoryErrors[keyof OperationLogsHistoryErrors];
+export type OperationLogsHistoryResponses = {
+  200: OperationLogPage;
+};
+export type OperationLogsHistoryResponse =
+  OperationLogsHistoryResponses[keyof OperationLogsHistoryResponses];
+export type OperationLogsRelatedData = {
+  body?: never;
+  path: {
+    log_id: string;
+  };
+  query?: {
+    page?: number;
+    page_size?: number;
+  };
+  url: '/api/v1/operation-logs/{log_id}/related/';
+};
+export type OperationLogsRelatedErrors = {
+  400: Error;
+  403: Error;
+  404: Error;
+  406: Error;
+  500: Error;
+  503: Error;
+};
+export type OperationLogsRelatedError =
+  OperationLogsRelatedErrors[keyof OperationLogsRelatedErrors];
+export type OperationLogsRelatedResponses = {
+  200: RelatedOperationLogPage;
+};
+export type OperationLogsRelatedResponse =
+  OperationLogsRelatedResponses[keyof OperationLogsRelatedResponses];
+export type OperationLogsExportData = {
+  body?: never;
+  path?: never;
+  query?: {
+    ended_after?: string;
+    ended_before?: string;
+    operation?: string;
+    ordering?: string;
+    project_id?: string;
+    q?: string;
+    result?: string;
+    started_after?: string;
+    started_before?: string;
+    view?: string;
+  };
+  url: '/api/v1/operation-logs/export/';
+};
+export type OperationLogsExportErrors = {
+  400: Error;
+  403: Error;
+  404: Error;
+  406: Error;
+  413: Error;
+  500: Error;
+  503: Error;
+};
+export type OperationLogsExportError =
+  OperationLogsExportErrors[keyof OperationLogsExportErrors];
+export type OperationLogsExportResponses = {
+  200: Blob | File;
+};
+export type OperationLogsExportResponse =
+  OperationLogsExportResponses[keyof OperationLogsExportResponses];
+export type OperationLogsStatisticsData = {
+  body?: never;
+  path?: never;
+  query?: {
+    ended_after?: string;
+    ended_before?: string;
+    operation?: string;
+    ordering?: string;
+    page?: number;
+    page_size?: number;
+    project_id?: string;
+    q?: string;
+    result?: string;
+    started_after?: string;
+    started_before?: string;
+    view?: string;
+  };
+  url: '/api/v1/operation-logs/statistics/';
+};
+export type OperationLogsStatisticsErrors = {
+  400: Error;
+  403: Error;
+  404: Error;
+  406: Error;
+  500: Error;
+  503: Error;
+};
+export type OperationLogsStatisticsError =
+  OperationLogsStatisticsErrors[keyof OperationLogsStatisticsErrors];
+export type OperationLogsStatisticsResponses = {
+  200: OperationStatistics;
+};
+export type OperationLogsStatisticsResponse =
+  OperationLogsStatisticsResponses[keyof OperationLogsStatisticsResponses];
 export type ProjectsListData = {
   body?: never;
   path?: never;
   query?: {
     page?: number;
     page_size?: number;
+    q?: string;
   };
   url: '/api/v1/projects/';
 };
@@ -2110,6 +2931,7 @@ export type ProjectsListErrors = {
   404: Error;
   406: Error;
   409: Error;
+  410: Error;
   413: Error;
   415: Error;
   500: Error;
@@ -2138,6 +2960,7 @@ export type ProjectsCreateErrors = {
   404: Error;
   406: Error;
   409: Error;
+  410: Error;
   413: Error;
   415: Error;
   500: Error;
@@ -2151,6 +2974,39 @@ export type ProjectsCreateResponses = {
 };
 export type ProjectsCreateResponse =
   ProjectsCreateResponses[keyof ProjectsCreateResponses];
+export type ProjectsDeleteData = {
+  body?: never;
+  headers: {
+    'Idempotency-Key': string;
+    Origin: string;
+    'X-CSRFToken': string;
+  };
+  path: {
+    project_id: string;
+  };
+  query?: never;
+  url: '/api/v1/projects/{project_id}/';
+};
+export type ProjectsDeleteErrors = {
+  400: Error;
+  403: Error;
+  404: Error;
+  406: Error;
+  409: Error;
+  410: Error;
+  413: Error;
+  415: Error;
+  500: Error;
+  503: Error;
+};
+export type ProjectsDeleteError =
+  ProjectsDeleteErrors[keyof ProjectsDeleteErrors];
+export type ProjectsDeleteResponses = {
+  200: Job;
+  202: Job;
+};
+export type ProjectsDeleteResponse =
+  ProjectsDeleteResponses[keyof ProjectsDeleteResponses];
 export type ProjectsRetrieveData = {
   body?: never;
   path: {
@@ -2165,6 +3021,7 @@ export type ProjectsRetrieveErrors = {
   404: Error;
   406: Error;
   409: Error;
+  410: Error;
   413: Error;
   415: Error;
   500: Error;
@@ -2177,6 +3034,61 @@ export type ProjectsRetrieveResponses = {
 };
 export type ProjectsRetrieveResponse =
   ProjectsRetrieveResponses[keyof ProjectsRetrieveResponses];
+export type ProjectDeletionPreviewData = {
+  body?: never;
+  path: {
+    project_id: string;
+  };
+  query?: never;
+  url: '/api/v1/projects/{project_id}/deletion-preview/';
+};
+export type ProjectDeletionPreviewErrors = {
+  403: Error;
+  404: Error;
+  406: Error;
+  500: Error;
+  503: Error;
+};
+export type ProjectDeletionPreviewError =
+  ProjectDeletionPreviewErrors[keyof ProjectDeletionPreviewErrors];
+export type ProjectDeletionPreviewResponses = {
+  200: DeletionPreview;
+};
+export type ProjectDeletionPreviewResponse =
+  ProjectDeletionPreviewResponses[keyof ProjectDeletionPreviewResponses];
+export type FolderImportsCreateData = {
+  body: FolderInputRequest;
+  headers: {
+    'Idempotency-Key': string;
+    Origin: string;
+    'X-CSRFToken': string;
+  };
+  path: {
+    project_id: string;
+  };
+  query?: never;
+  url: '/api/v1/projects/{project_id}/folder-imports/';
+};
+export type FolderImportsCreateErrors = {
+  400: Error;
+  403: Error;
+  404: Error;
+  406: Error;
+  409: Error;
+  410: Error;
+  413: Error;
+  415: Error;
+  500: Error;
+  503: Error;
+};
+export type FolderImportsCreateError =
+  FolderImportsCreateErrors[keyof FolderImportsCreateErrors];
+export type FolderImportsCreateResponses = {
+  200: Job;
+  202: Job;
+};
+export type FolderImportsCreateResponse =
+  FolderImportsCreateResponses[keyof FolderImportsCreateResponses];
 export type ImportsCreateData = {
   body: ImportInputRequest;
   headers: {
@@ -2196,6 +3108,7 @@ export type ImportsCreateErrors = {
   404: Error;
   406: Error;
   409: Error;
+  410: Error;
   413: Error;
   415: Error;
   500: Error;
@@ -2225,6 +3138,7 @@ export type ProjectSnapshotComparisonsListErrors = {
   404: Error;
   406: Error;
   409: Error;
+  410: Error;
   413: Error;
   415: Error;
   500: Error;
@@ -2251,24 +3165,13 @@ export type ProjectSnapshotComparisonsCreateData = {
   url: '/api/v1/projects/{project_id}/snapshot-comparisons/';
 };
 export type ProjectSnapshotComparisonsCreateErrors = {
-  400: Error;
   403: Error;
-  404: Error;
   406: Error;
-  409: Error;
-  413: Error;
-  415: Error;
+  410: Error;
   500: Error;
-  503: Error;
 };
 export type ProjectSnapshotComparisonsCreateError =
   ProjectSnapshotComparisonsCreateErrors[keyof ProjectSnapshotComparisonsCreateErrors];
-export type ProjectSnapshotComparisonsCreateResponses = {
-  200: Job;
-  202: Job;
-};
-export type ProjectSnapshotComparisonsCreateResponse =
-  ProjectSnapshotComparisonsCreateResponses[keyof ProjectSnapshotComparisonsCreateResponses];
 export type SnapshotsListData = {
   body?: never;
   path: {
@@ -2286,6 +3189,7 @@ export type SnapshotsListErrors = {
   404: Error;
   406: Error;
   409: Error;
+  410: Error;
   413: Error;
   415: Error;
   500: Error;
@@ -2297,6 +3201,62 @@ export type SnapshotsListResponses = {
 };
 export type SnapshotsListResponse =
   SnapshotsListResponses[keyof SnapshotsListResponses];
+export type ProjectsActivityRetrieveData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: '/api/v1/projects/activity/';
+};
+export type ProjectsActivityRetrieveErrors = {
+  400: Error;
+  403: Error;
+  404: Error;
+  406: Error;
+  409: Error;
+  410: Error;
+  413: Error;
+  415: Error;
+  500: Error;
+  503: Error;
+};
+export type ProjectsActivityRetrieveError =
+  ProjectsActivityRetrieveErrors[keyof ProjectsActivityRetrieveErrors];
+export type ProjectsActivityRetrieveResponses = {
+  200: ProjectActivity;
+};
+export type ProjectsActivityRetrieveResponse =
+  ProjectsActivityRetrieveResponses[keyof ProjectsActivityRetrieveResponses];
+export type ProjectsManagementListData = {
+  body?: never;
+  path?: never;
+  query?: {
+    ordering?: 'created' | 'name' | 'recent_import';
+    page?: number;
+    page_size?: number;
+    q?: string;
+    technology?: string;
+  };
+  url: '/api/v1/projects/management/';
+};
+export type ProjectsManagementListErrors = {
+  400: Error;
+  403: Error;
+  404: Error;
+  406: Error;
+  409: Error;
+  410: Error;
+  413: Error;
+  415: Error;
+  500: Error;
+  503: Error;
+};
+export type ProjectsManagementListError =
+  ProjectsManagementListErrors[keyof ProjectsManagementListErrors];
+export type ProjectsManagementListResponses = {
+  200: ProjectManagementPage;
+};
+export type ProjectsManagementListResponse =
+  ProjectsManagementListResponses[keyof ProjectsManagementListResponses];
 export type SnapshotComparisonsRetrieveData = {
   body?: never;
   path: {
@@ -2311,6 +3271,7 @@ export type SnapshotComparisonsRetrieveErrors = {
   404: Error;
   406: Error;
   409: Error;
+  410: Error;
   413: Error;
   415: Error;
   500: Error;
@@ -2340,6 +3301,7 @@ export type ComparisonFilesListErrors = {
   404: Error;
   406: Error;
   409: Error;
+  410: Error;
   413: Error;
   415: Error;
   500: Error;
@@ -2367,6 +3329,7 @@ export type ComparisonFilesRetrieveErrors = {
   404: Error;
   406: Error;
   409: Error;
+  410: Error;
   413: Error;
   415: Error;
   500: Error;
@@ -2407,6 +3370,68 @@ export type ComparisonImpactRetrieveResponses = {
 };
 export type ComparisonImpactRetrieveResponse =
   ComparisonImpactRetrieveResponses[keyof ComparisonImpactRetrieveResponses];
+export type SnapshotsSearchData = {
+  body?: never;
+  path?: never;
+  query?: {
+    page?: number;
+    page_size?: number;
+    q?: string;
+  };
+  url: '/api/v1/snapshots/';
+};
+export type SnapshotsSearchErrors = {
+  400: Error;
+  403: Error;
+  404: Error;
+  406: Error;
+  409: Error;
+  410: Error;
+  413: Error;
+  415: Error;
+  500: Error;
+  503: Error;
+};
+export type SnapshotsSearchError =
+  SnapshotsSearchErrors[keyof SnapshotsSearchErrors];
+export type SnapshotsSearchResponses = {
+  200: SnapshotSearchPage;
+};
+export type SnapshotsSearchResponse =
+  SnapshotsSearchResponses[keyof SnapshotsSearchResponses];
+export type SnapshotsDeleteData = {
+  body?: never;
+  headers: {
+    'Idempotency-Key': string;
+    Origin: string;
+    'X-CSRFToken': string;
+  };
+  path: {
+    snapshot_id: string;
+  };
+  query?: never;
+  url: '/api/v1/snapshots/{snapshot_id}/';
+};
+export type SnapshotsDeleteErrors = {
+  400: Error;
+  403: Error;
+  404: Error;
+  406: Error;
+  409: Error;
+  410: Error;
+  413: Error;
+  415: Error;
+  500: Error;
+  503: Error;
+};
+export type SnapshotsDeleteError =
+  SnapshotsDeleteErrors[keyof SnapshotsDeleteErrors];
+export type SnapshotsDeleteResponses = {
+  200: Job;
+  202: Job;
+};
+export type SnapshotsDeleteResponse =
+  SnapshotsDeleteResponses[keyof SnapshotsDeleteResponses];
 export type SnapshotsRetrieveData = {
   body?: never;
   path: {
@@ -2421,6 +3446,7 @@ export type SnapshotsRetrieveErrors = {
   404: Error;
   406: Error;
   409: Error;
+  410: Error;
   413: Error;
   415: Error;
   500: Error;
@@ -2451,6 +3477,7 @@ export type SnapshotsRenameErrors = {
   404: Error;
   406: Error;
   409: Error;
+  410: Error;
   413: Error;
   415: Error;
   500: Error;
@@ -2482,6 +3509,7 @@ export type AnalysesCreateErrors = {
   404: Error;
   406: Error;
   409: Error;
+  410: Error;
   413: Error;
   415: Error;
   500: Error;
@@ -2495,6 +3523,28 @@ export type AnalysesCreateResponses = {
 };
 export type AnalysesCreateResponse =
   AnalysesCreateResponses[keyof AnalysesCreateResponses];
+export type SnapshotDeletionPreviewData = {
+  body?: never;
+  path: {
+    snapshot_id: string;
+  };
+  query?: never;
+  url: '/api/v1/snapshots/{snapshot_id}/deletion-preview/';
+};
+export type SnapshotDeletionPreviewErrors = {
+  403: Error;
+  404: Error;
+  406: Error;
+  500: Error;
+  503: Error;
+};
+export type SnapshotDeletionPreviewError =
+  SnapshotDeletionPreviewErrors[keyof SnapshotDeletionPreviewErrors];
+export type SnapshotDeletionPreviewResponses = {
+  200: DeletionPreview;
+};
+export type SnapshotDeletionPreviewResponse =
+  SnapshotDeletionPreviewResponses[keyof SnapshotDeletionPreviewResponses];
 export type SnapshotFilesListData = {
   body?: never;
   path: {
@@ -2512,6 +3562,7 @@ export type SnapshotFilesListErrors = {
   404: Error;
   406: Error;
   409: Error;
+  410: Error;
   413: Error;
   415: Error;
   500: Error;
@@ -2542,6 +3593,7 @@ export type SnapshotFileContentRetrieveErrors = {
   404: Error;
   406: Error;
   409: Error;
+  410: Error;
   413: Error;
   415: Error;
   500: Error;
@@ -2554,6 +3606,166 @@ export type SnapshotFileContentRetrieveResponses = {
 };
 export type SnapshotFileContentRetrieveResponse =
   SnapshotFileContentRetrieveResponses[keyof SnapshotFileContentRetrieveResponses];
+export type SnapshotFileEvidenceListData = {
+  body?: never;
+  path: {
+    file_id: string;
+    snapshot_id: string;
+  };
+  query?: {
+    analysis_id?: string;
+    page?: number;
+    page_size?: number;
+    scan_id?: string;
+  };
+  url: '/api/v1/snapshots/{snapshot_id}/files/{file_id}/evidence/';
+};
+export type SnapshotFileEvidenceListErrors = {
+  400: Error;
+  403: Error;
+  404: Error;
+  406: Error;
+  409: Error;
+  410: Error;
+  500: Error;
+};
+export type SnapshotFileEvidenceListError =
+  SnapshotFileEvidenceListErrors[keyof SnapshotFileEvidenceListErrors];
+export type SnapshotFileEvidenceListResponses = {
+  200: SourceEvidencePage;
+};
+export type SnapshotFileEvidenceListResponse =
+  SnapshotFileEvidenceListResponses[keyof SnapshotFileEvidenceListResponses];
+export type SnapshotKnowledgeCardsListData = {
+  body?: never;
+  path: {
+    snapshot_id: string;
+  };
+  query?: {
+    analysis_id?: string;
+    concept_key?: string;
+    endpoint_index?: string;
+    file_path?: string;
+    page?: number;
+    page_size?: number;
+    scan_id?: string;
+  };
+  url: '/api/v1/snapshots/{snapshot_id}/knowledge-cards/';
+};
+export type SnapshotKnowledgeCardsListErrors = {
+  400: Error;
+  403: Error;
+  404: Error;
+  406: Error;
+  409: Error;
+  410: Error;
+  413: Error;
+  415: Error;
+  500: Error;
+  503: Error;
+};
+export type SnapshotKnowledgeCardsListError =
+  SnapshotKnowledgeCardsListErrors[keyof SnapshotKnowledgeCardsListErrors];
+export type SnapshotKnowledgeCardsListResponses = {
+  200: SnapshotKnowledgePage;
+};
+export type SnapshotKnowledgeCardsListResponse =
+  SnapshotKnowledgeCardsListResponses[keyof SnapshotKnowledgeCardsListResponses];
+export type SnapshotKnowledgeHitsListData = {
+  body?: never;
+  path: {
+    snapshot_id: string;
+  };
+  query?: {
+    analysis_id?: string;
+    concept_key?: string;
+    endpoint_index?: string;
+    file_path?: string;
+    page?: number;
+    page_size?: number;
+    scan_id?: string;
+  };
+  url: '/api/v1/snapshots/{snapshot_id}/knowledge-hits/';
+};
+export type SnapshotKnowledgeHitsListErrors = {
+  400: Error;
+  403: Error;
+  404: Error;
+  406: Error;
+  409: Error;
+  410: Error;
+  413: Error;
+  415: Error;
+  500: Error;
+  503: Error;
+};
+export type SnapshotKnowledgeHitsListError =
+  SnapshotKnowledgeHitsListErrors[keyof SnapshotKnowledgeHitsListErrors];
+export type SnapshotKnowledgeHitsListResponses = {
+  200: KnowledgeHitPage;
+};
+export type SnapshotKnowledgeHitsListResponse =
+  SnapshotKnowledgeHitsListResponses[keyof SnapshotKnowledgeHitsListResponses];
+export type SourceScansCreateData = {
+  body?: never;
+  headers: {
+    'Idempotency-Key': string;
+    Origin: string;
+    'X-CSRFToken': string;
+  };
+  path: {
+    snapshot_id: string;
+  };
+  query?: never;
+  url: '/api/v1/snapshots/{snapshot_id}/source-scans/';
+};
+export type SourceScansCreateErrors = {
+  400: Error;
+  403: Error;
+  404: Error;
+  406: Error;
+  409: Error;
+  410: Error;
+  413: Error;
+  415: Error;
+  500: Error;
+  503: Error;
+};
+export type SourceScansCreateError =
+  SourceScansCreateErrors[keyof SourceScansCreateErrors];
+export type SourceScansCreateResponses = {
+  200: Job;
+  202: Job;
+};
+export type SourceScansCreateResponse =
+  SourceScansCreateResponses[keyof SourceScansCreateResponses];
+export type SourceScansRetrieveData = {
+  body?: never;
+  path: {
+    scan_id: string;
+  };
+  query?: never;
+  url: '/api/v1/source-scans/{scan_id}/';
+};
+export type SourceScansRetrieveErrors = {
+  400: Error;
+  403: Error;
+  404: Error;
+  406: Error;
+  409: Error;
+  410: Error;
+  413: Error;
+  415: Error;
+  500: Error;
+  503: Error;
+};
+export type SourceScansRetrieveError =
+  SourceScansRetrieveErrors[keyof SourceScansRetrieveErrors];
+export type SourceScansRetrieveResponses = {
+  200: SourceScan;
+};
+export type SourceScansRetrieveResponse =
+  SourceScansRetrieveResponses[keyof SourceScansRetrieveResponses];
 export type SystemChecksCreateData = {
   body: {
     [key: string]: never;
@@ -2568,24 +3780,13 @@ export type SystemChecksCreateData = {
   url: '/api/v1/system-checks/';
 };
 export type SystemChecksCreateErrors = {
-  400: Error;
   403: Error;
-  404: Error;
   406: Error;
-  409: Error;
-  413: Error;
-  415: Error;
+  410: Error;
   500: Error;
-  503: Error;
 };
 export type SystemChecksCreateError =
   SystemChecksCreateErrors[keyof SystemChecksCreateErrors];
-export type SystemChecksCreateResponses = {
-  200: Job;
-  202: Job;
-};
-export type SystemChecksCreateResponse =
-  SystemChecksCreateResponses[keyof SystemChecksCreateResponses];
 export type SystemChecksRetrieveData = {
   body?: never;
   path: {
@@ -2599,6 +3800,7 @@ export type SystemChecksRetrieveErrors = {
   403: Error;
   404: Error;
   406: Error;
+  410: Error;
   500: Error;
   503: Error;
 };
@@ -2627,6 +3829,7 @@ export type SystemLabRunsListErrors = {
   404: Error;
   406: Error;
   409: Error;
+  410: Error;
   413: Error;
   415: Error;
   500: Error;
@@ -2653,6 +3856,7 @@ export type SystemLabRunsRetrieveErrors = {
   404: Error;
   406: Error;
   409: Error;
+  410: Error;
   413: Error;
   415: Error;
   500: Error;
@@ -2682,6 +3886,7 @@ export type SystemLabsListErrors = {
   404: Error;
   406: Error;
   409: Error;
+  410: Error;
   413: Error;
   415: Error;
   500: Error;
@@ -2711,6 +3916,7 @@ export type SystemLabsRetrieveErrors = {
   404: Error;
   406: Error;
   409: Error;
+  410: Error;
   413: Error;
   415: Error;
   500: Error;
@@ -2737,21 +3943,10 @@ export type SystemLabRunsCreateData = {
   url: '/api/v1/system-labs/{lab_id}/runs/';
 };
 export type SystemLabRunsCreateErrors = {
-  400: Error;
   403: Error;
-  404: Error;
   406: Error;
-  409: Error;
-  413: Error;
-  415: Error;
+  410: Error;
   500: Error;
-  503: Error;
 };
 export type SystemLabRunsCreateError =
   SystemLabRunsCreateErrors[keyof SystemLabRunsCreateErrors];
-export type SystemLabRunsCreateResponses = {
-  200: Job;
-  202: Job;
-};
-export type SystemLabRunsCreateResponse =
-  SystemLabRunsCreateResponses[keyof SystemLabRunsCreateResponses];

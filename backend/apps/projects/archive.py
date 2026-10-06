@@ -19,6 +19,7 @@ from apps.projects.types import (
 )
 
 SOURCE_EXTENSIONS = (".py", ".js", ".jsx", ".ts", ".tsx")
+SOURCE_MANIFEST_PATTERN = re.compile(r"requirements(?:[-_.][A-Za-z0-9_-]+)?\.txt\Z")
 EXCLUDED_DIRECTORIES = {
     ".git",
     ".hg",
@@ -146,7 +147,13 @@ def disposition(path: str) -> str:
         or name.startswith(("credentials.", "secrets.", "id_rsa.", "id_ed25519."))
     ):
         return "excluded"
-    return "source" if Path(name).suffix in SOURCE_EXTENSIONS else "unsupported"
+    return (
+        "source"
+        if Path(name).suffix in SOURCE_EXTENSIONS
+        or name == "pyproject.toml"
+        or SOURCE_MANIFEST_PATTERN.fullmatch(name)
+        else "unsupported"
+    )
 
 
 def inspect_archive(

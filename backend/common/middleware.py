@@ -58,7 +58,7 @@ class LocalBoundaryMiddleware:
 
     def respond(self, request: HttpRequest) -> HttpResponse:
         response: HttpResponse
-        request_id = uuid.uuid4().hex
+        request_id = getattr(request, "request_id", uuid.uuid4().hex)
         setattr(request, "request_id", request_id)
         try:
             host_valid = request.get_host() == settings.APP_AUTHORITY

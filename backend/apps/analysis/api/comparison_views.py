@@ -15,16 +15,20 @@ from apps.analysis.api.comparison_serializers import (
     ComparisonInputSerializer,
     SnapshotComparisonSerializer,
 )
-from apps.analysis.diffs.services import read_comparison, submit_comparison
+from apps.analysis.diffs.services import read_comparison
 from apps.analysis.diffs.types import ComparisonData
-from apps.analysis.models import Analysis, SnapshotComparison, SnapshotComparisonRequest
+from apps.analysis.models import SnapshotComparison, SnapshotComparisonRequest
 from apps.jobs.api.serializers import ErrorSerializer, JobSerializer
 from apps.jobs.models import Job
-from apps.projects.models import Project, Snapshot
-from common.api import json_input, operation_key, page_response
-from common.errors import ApiProblem, error_body
+from apps.projects.models import Project
+from common.api import page_response
+from common.errors import ApiProblem
+from common.resource_state import require_project_available, require_snapshot_available
+from common.retirement import retired_feature
 
-ERRORS = {status: ErrorSerializer for status in (400, 403, 404, 409, 413, 415, 503)}
+ERRORS = {
+    status: ErrorSerializer for status in (400, 403, 404, 409, 410, 413, 415, 503)
+}
 PAGES = [OpenApiParameter("page", int), OpenApiParameter("page_size", int)]
 
 
@@ -34,6 +38,8 @@ def ready_comparison(
     record = get_object_or_404(
         SnapshotComparisonRequest.objects.select_related("job"), pk=comparison_id
     )
+    require_snapshot_available(record.base_snapshot)
+    require_snapshot_available(record.target_snapshot)
     if record.job.status != Job.Status.SUCCEEDED:
         raise ApiProblem(
             409,
@@ -61,6 +67,7 @@ class ProjectComparisonsView(APIView):
     )
     def get(self, request: Request, project_id: uuid.UUID) -> Response:
         project = get_object_or_404(Project, pk=project_id)
+        require_project_available(project)
         records = (
             SnapshotComparisonRequest.objects.filter(project=project)
             .select_related("job", "result")
@@ -83,41 +90,7 @@ class ProjectComparisonsView(APIView):
         responses={200: JobSerializer, 202: JobSerializer, **ERRORS},
     )
     def post(self, request: Request, project_id: uuid.UUID) -> Response:
-        fields = json_input(request, ComparisonInputSerializer).validated_data
-        project = get_object_or_404(Project, pk=project_id)
-        base, target = [
-            get_object_or_404(Snapshot, pk=fields[key])
-            for key in ("base_snapshot_id", "target_snapshot_id")
-        ]
-        base_analysis, target_analysis = [
-            get_object_or_404(Analysis, pk=fields[key]) if fields[key] else None
-            for key in ("base_analysis_id", "target_analysis_id")
-        ]
-        job, created, published = submit_comparison(
-            project,
-            operation_key(request),
-            base,
-            target,
-            base_analysis,
-            target_analysis,
-        )
-        location = f"/api/v1/jobs/{job.pk}/"
-        if not published:
-            return Response(
-                error_body(
-                    "SERVICE_UNAVAILABLE",
-                    "对比投递未确认，记录已保存，请查询任务状态。",
-                    getattr(request, "request_id"),
-                    {"job_url": location},
-                ),
-                status=503,
-                headers={"Location": location},
-            )
-        return Response(
-            JobSerializer(job).data,
-            status=202 if created else 200,
-            headers={"Location": location},
-        )
+        retired_feature("snapshot_comparison")
 
 
 class ComparisonDetailView(APIView):

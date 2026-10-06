@@ -9,7 +9,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.analysis.models import Analysis
-from apps.jobs.api.serializers import ErrorSerializer, JobSerializer
+from apps.jobs.api.serializers import ErrorSerializer
 from apps.labs.api.serializers import (
     LabInputSerializer,
     LabPageSerializer,
@@ -19,11 +19,14 @@ from apps.labs.api.serializers import (
 )
 from apps.labs.definition import definition
 from apps.labs.models import LabRun
-from apps.labs.services import submit_run
-from common.api import json_input, operation_key, page_response, resource_filters
-from common.errors import ApiProblem, error_body
+from common.api import page_response, resource_filters
+from common.errors import ApiProblem
+from common.resource_state import require_snapshot_available
+from common.retirement import retired_feature
 
-ERRORS = {status: ErrorSerializer for status in (400, 403, 404, 409, 413, 415, 503)}
+ERRORS = {
+    status: ErrorSerializer for status in (400, 403, 404, 409, 410, 413, 415, 503)
+}
 WORKSPACE = [
     OpenApiParameter("analysis_id", uuid.UUID, required=True),
     OpenApiParameter("endpoint_index", int, required=True),
@@ -40,6 +43,7 @@ def lab_for(
     if set(filters) != {"analysis_id", "endpoint_index"}:
         raise ValidationError({"query": ["必须指定分析与接口。"]})
     analysis = get_object_or_404(Analysis, pk=filters["analysis_id"])
+    require_snapshot_available(analysis.snapshot)
     return filters, definition(analysis, int(filters["endpoint_index"]))
 
 
@@ -69,35 +73,16 @@ class LabDetailView(APIView):
 class SubmitRunView(APIView):
     @extend_schema(
         operation_id="lab_runs_create",
+        deprecated=True,
         request=LabInputSerializer,
         parameters=[
             OpenApiParameter(name, str, OpenApiParameter.HEADER, required=True)
             for name in ("Idempotency-Key", "X-CSRFToken", "Origin")
         ],
-        responses={200: JobSerializer, 202: JobSerializer, **ERRORS},
+        responses=ERRORS,
     )
     def post(self, request: Request, lab_id: str) -> Response:
-        if lab_id != "request-validation":
-            raise ApiProblem(404, "RESOURCE_NOT_FOUND", "实验不存在。")
-        values = json_input(request, LabInputSerializer).validated_data
-        job, created, published = submit_run(operation_key(request), values)
-        location = f"/api/v1/jobs/{job.pk}/"
-        if not published:
-            return Response(
-                error_body(
-                    "SERVICE_UNAVAILABLE",
-                    "实验投递未确认，请查询已保存任务。",
-                    getattr(request, "request_id"),
-                    {"job_url": location},
-                ),
-                status=503,
-                headers={"Location": location},
-            )
-        return Response(
-            JobSerializer(job).data,
-            status=202 if created else 200,
-            headers={"Location": location},
-        )
+        retired_feature("lab")
 
 
 class RunsView(APIView):
@@ -115,7 +100,11 @@ class RunsView(APIView):
         filters = resource_filters(request, ("analysis_id", "endpoint_index", "job_id"))
         return page_response(
             request,
-            LabRun.objects.select_related("job", "analysis").filter(**filters),
+            LabRun.objects.select_related("job", "analysis").filter(
+                analysis__snapshot__deletion_request_id__isnull=True,
+                analysis__snapshot__project__deletion_request_id__isnull=True,
+                **filters,
+            ),
             LabRunSerializer,
             filters=filters,
         )
@@ -128,10 +117,9 @@ class RunDetailView(APIView):
     def get(self, request: Request, run_id: uuid.UUID) -> Response:
         if request.query_params:
             raise ValidationError({"query": ["不支持此查询参数。"]})
-        return Response(
-            LabRunSerializer(
-                get_object_or_404(
-                    LabRun.objects.select_related("job", "analysis"), pk=run_id
-                )
-            ).data
+        run = get_object_or_404(
+            LabRun.objects.select_related("job", "analysis__snapshot__project"),
+            pk=run_id,
         )
+        require_snapshot_available(run.analysis.snapshot)
+        return Response(LabRunSerializer(run).data)

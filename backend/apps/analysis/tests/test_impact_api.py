@@ -1,4 +1,4 @@
-"""通过真实导入图验证影响查询、两侧变化和原始历史不变。"""
+"""通过实际导入图和直接历史夹具验证只读影响证据与原始记录不变。"""
 
 import copy
 import uuid
@@ -9,12 +9,15 @@ from unittest.mock import patch
 import pytest
 from django.test import override_settings
 
-from apps.analysis.diffs.services import execute_comparison, submit_comparison
-from apps.analysis.models import Analysis, AnalysisGraph, SnapshotComparison
-from apps.analysis.reviews import submit_review
+from apps.analysis.models import (
+    Analysis,
+    AnalysisGraph,
+    RelationReview,
+    RelationReviewState,
+)
 from apps.analysis.services import execute_analysis, read_graph
 from apps.analysis.tests.test_analysis import imported, submitted
-from apps.analysis.tests.test_comparisons import submit
+from apps.analysis.tests.test_comparisons import publish_history, submit
 from apps.jobs.tests.test_contract import assert_response, contract_schema
 from apps.jobs.tests.test_jobs import client_with_token
 from apps.projects.models import Snapshot
@@ -61,13 +64,21 @@ def test_default_candidates_manual_revision_exclude_and_strict_query() -> None:
     )
     opted = client.get(path, {**query, "include_candidates": "true"}).json()
     assert any(item["via_candidate"] for item in opted["results"])
-    submit_review(
-        analysis,
-        uuid.uuid4(),
-        uuid.UUID(candidate["source_id"]),
-        uuid.UUID(candidate["target_id"]),
-        "confirm",
-        0,
+    state = RelationReviewState.objects.create(
+        analysis=analysis,
+        request_id=candidate["source_id"],
+        revision=1,
+        confirmed_target_id=candidate["target_id"],
+        excluded_target_ids=[],
+    )
+    RelationReview.objects.create(
+        analysis=analysis,
+        request_id=candidate["source_id"],
+        target_id=candidate["target_id"],
+        action="confirm",
+        revision=1,
+        idempotency_key=uuid.uuid4(),
+        request_digest="0" * 64,
     )
     confirmed = client.get(path, query).json()
     assert any(
@@ -78,13 +89,20 @@ def test_default_candidates_manual_revision_exclude_and_strict_query() -> None:
     assert all(
         item["decision"] == "confirmed" for item in confirmed["relation_reviews"]
     )
-    submit_review(
-        analysis,
-        uuid.uuid4(),
-        uuid.UUID(candidate["source_id"]),
-        uuid.UUID(candidate["target_id"]),
-        "exclude",
-        1,
+    state.revision, state.confirmed_target_id, state.excluded_target_ids = (
+        2,
+        None,
+        [candidate["target_id"]],
+    )
+    state.save(update_fields=["revision", "confirmed_target_id", "excluded_target_ids"])
+    RelationReview.objects.create(
+        analysis=analysis,
+        request_id=candidate["source_id"],
+        target_id=candidate["target_id"],
+        action="exclude",
+        revision=2,
+        idempotency_key=uuid.uuid4(),
+        request_digest="0" * 64,
     )
     selected = client.get(path, {**query, "include_candidates": "true"}).json()
     assert candidate["id"] not in {edge["id"] for edge in selected["edges"]}
@@ -130,8 +148,7 @@ def test_both_sides_deleted_added_unmapped_and_file_only() -> None:
     execute_import(str(job.pk))
     target = Snapshot.objects.get(job=job)
     comparison_job = submit(base, target, True)
-    execute_comparison(str(comparison_job.pk))
-    result = SnapshotComparison.objects.get(request__job=comparison_job)
+    result = publish_history(comparison_job)
     client, path = client_with_token(), COMPARISON.format(comparison_id=result.pk)
     with patch(
         "apps.explanations.adapter.complete", side_effect=AssertionError("不能调用模型")
@@ -162,8 +179,7 @@ def test_both_sides_deleted_added_unmapped_and_file_only() -> None:
     )
     assert client.get(path, {"change_id": str(uuid.uuid4())}).status_code == 404
     file_job = submit(base, target)
-    execute_comparison(str(file_job.pk))
-    file_only = SnapshotComparison.objects.get(request__job=file_job)
+    file_only = publish_history(file_job)
     unavailable = client.get(COMPARISON.format(comparison_id=file_only.pk)).json()
     assert (
         unavailable["base"]["impact"] is None and not unavailable["target"]["available"]
@@ -172,17 +188,16 @@ def test_both_sides_deleted_added_unmapped_and_file_only() -> None:
     assert result.request.target_analysis_id is not None
     AnalysisGraph.objects.filter(analysis_id=result.request.target_analysis_id).delete()
     assert client.get(path).status_code == 500
-    with patch("apps.jobs.services.app.send_task"):
-        legacy_job = submit_comparison(
-            base.project,
-            uuid.uuid4(),
-            base,
-            target,
-            result.request.base_analysis,
-            result.request.target_analysis,
-        )[0]
-    execute_comparison(str(legacy_job.pk))
-    legacy = SnapshotComparison.objects.get(request__job=legacy_job)
+    assert (
+        result.request.base_analysis is not None
+        and result.request.target_analysis is not None
+    )
+    legacy_job = submit(
+        base,
+        target,
+        analyses=(result.request.base_analysis, result.request.target_analysis),
+    )
+    legacy = publish_history(legacy_job)
     assert not client.get(COMPARISON.format(comparison_id=legacy.pk)).json()["target"][
         "available"
     ]

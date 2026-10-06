@@ -2,17 +2,44 @@
 
 | 项目 | 内容 |
 | --- | --- |
-| 文档版本 | v0.20 |
+| 文档版本 | v0.25 |
 | 文档状态 | v0.1 至 v1.0 的既有协议已实现；实际验收见所属阶段计划 |
-| 更新日期 | 2026-10-01 |
+| 更新日期 | 2026-10-04 |
 | 适用阶段 | v0.1 至 v1.0；HTTP API v1 |
 | 本文职责 | 字段、响应、错误、分页、任务状态和本地访问协议的权威来源 |
+
+## M27 增量契约
+
+M27 延续 M26 的三入口和退役边界；本节为当前规则，M1–M26 的界面与验收保留为阶段历史。课程、练习、实验、比较、影响、人工校准、通知写入及基础检查仍退役，旧写入口返回 `410 FEATURE_RETIRED`。本轮进度和实际证据唯一见[第四阶段计划 M27](phase-4-plan.md#m27)。
+
+- 当前契约共83操作，保留历史编号；新增目录导入/重试、源码扫描/读取、知识卡片/命中、接口关联图、删除预览/DELETE及日志列表/详情。
+- Job仍为queued/running/succeeded/failed，增加source_scan/delete，source_kind、parent_job_id、result_deleted_at/result_deleted。结果删除后URL为null，仅摘要可读。
+- Snapshot增加preparation_status及当前source_scan_id/scan_job_id/analysis_job_id/analysis_id。needs_root是准备状态，不是第五种Job状态；历史无准备记录返回pending而GET不补写。
+- 目录multipart的manifest为JSON文件：`{"files":[{"path":"app/views.py","index":0}]}`，files按连续index提交；只接受相对路径，来源由服务端可信入口保存，不接受用户抬高限额。
+- 删除预览含目标、范围、can_delete、接收状态、忙任务和confirmation_digest。DELETE接受该摘要，需Origin/CSRF/Idempotency-Key；202新任务/200重放，409忙或范围变化，410删除隔离。失败继续清理使用jobs重试新尝试，成功不能提前返回。
+- OperationLog独立保存UUID与名称、结果/时间、稳定错误、任务和事件；项目、operation、result、started_after/started_before、ended_after/ended_before组合筛选，时间须含时区，范围含边界，上界早于下界返回400。筛选先于计数及分页，分页链接保留全部条件。前置拒绝和重放追加事件；数据库不可用等未可靠记录必须明确。
+- 日志列表GET在OperationLogsView.initial中先有界解析查询：最多12个字段、4096字符，随后校验字段名、唯一值和时间范围，非法输入返回400。该例外仅适用于日志列表、统计和导出，其他端点保持全局查询预算。
+- OperationLog新增只读display_id，取值为1至9007199254740991的全局唯一固定整数；原id仍为UUID，详情URL、审计响应头与内部关联保持兼容。display_id不随筛选、翻页、刷新或目标删除改变；数据库序列允许失败事务跳号，不复用已分配编号。默认按开始时间倒序，其他排序见M27规则。
+- 日志列表q为单个、不超过200个Unicode字符的普通搜索文本；先校验原长度再修剪首尾空白，空白等同未搜索。操作类型中文显示名称或类型代码、操作对象名称、日志保存的项目名称进行不区分大小写的包含匹配，三种字段之间OR，与其他筛选AND。计数和分页前搜索，链接保留规范化q；已删除项目的日志仍按保存名称搜索。重复、超长或含NUL的q返回400且不回显输入；内部project_id参数保留兼容，但页面不展示或自动添加该条件。
+- OperationLog新增只读started_at（等于created_at，应用接收操作时间）和可空ended_at（本次操作首次可靠终态的审计时间），保留created_at/updated_at；结束时间不借用会继续更新的updated_at。未结束或无可靠记录返回null，不匹配结束时间范围。HTTP重放取本次首次response事件，内部重放取自身replayed事件，不随原任务后续完成漂移。旧legacy事件仅代表历史摘要观测时间，不能复原未保存的精确执行时间；损坏历史事件不回写，读取仅保留有效对象。
+- 接口关联direction=undirected，scope明确共享符号范围；原graph方向保持。知识分页含扫描版本、coverage和diagnostics，可按scan_id/file_path或analysis_id+endpoint_index筛选。
+- 预览模板1.1.0含保留片段匹配的知识版本。旧未消费确认不能提交新讲解；旧已生成结果可读。模型预算/期限现行策略不变。
+
+### M27 只读投影与日志查询
+
+- 项目管理读取接受`q/technology/ordering/page/page_size`，技术筛选项基于完整关键词范围；项目摘要批量查询最新可读快照和扫描事实，筛选排序先于分页。活动读取只投影已有导入/扫描/分析任务与审计事件。跨项目快照名称搜索校验项目和快照可读性。GET不扫描、不补写。
+- 源码依据以路径快照和文件为边界，可选`analysis_id/scan_id`必须属于该快照；分页去重聚合接口、图关系及知识命中，scope固定`persisted_source_evidence`，不生成通用引用索引。
+- 日志新增`view=all|failed|active|retryable`与`ordering=started_at|-started_at|ended_at|-ended_at`；非all视图与result同时存在返回400。日期范围与q规则保持，空结束时间始终最后、display_id稳定打破并列。
+- 统计使用同一次服务端as_of，完整继承q/operation/project_id及四个时间条件，忽略result/view/分页。failed仅失败、active为submitted/accepted/running，7天成功率按可靠ended_at归属，分母只含succeeded/failed；零分母及不可比较的差值为null。
+- 日志响应的`retry_action`为none/direct/upload_zip/select_folder/reconfirm_explanation/continue_cleanup，附拒绝理由与project_available；能力与写入重试共用资格判断，不能因展示后状态变化绕过提交校验。related按直接父子/重试身份，history按同对象及操作，均分页且不按名称猜测关系。
+- CSV使用列表完全相同的筛选和排序，拒绝page/page_size；UTF-8 BOM、标准引号/换行转义及公式前缀保护。超过10000条或10MiB返回413 EXPORT_LIMIT_EXCEEDED，不返回截断文件。只输出显示摘要与稳定错误码，不输出源码、凭据、原始事件和完整错误明细。
+- 不新增数据库表、迁移或写契约；HTTP v1、同源/CSRF、幂等及删除隔离规则保持，OpenAPI与前端类型由实现生成。
 
 ## 1. 契约来源与实现顺序
 
 [需求文档](requirements.md)确定业务行为，本文确定公共协议，[后端规范](backend-guidelines.md)与[前端规范](frontend-guidelines.md)引用本文，不重新定义公共格式。
 
-初始 v1.0 沿用 56 项 API、四态任务、幂等恢复、不可变快照和单次外发确认；用户追加服务端快照命名后为 57 项，名称作为独立展示元数据，源码与引用仍不可变。PATCH 名称沿用同源/CSRF 和严格 JSON 校验，不创建任务、不自动重试；相同名称自然幂等，具体字段及最后成功写入语义见 API 清单。页面渲染恢复不自动提交，工程复验见[第四阶段计划](phase-4-plan.md)。
+初始 v1.0 沿用 56 项 API、四态任务、幂等恢复、不可变快照和单次外发确认；快照命名增加至 57 项，M25 的通知已读和课程阅读进度增加至 62 项。名称作为独立展示元数据，源码与引用仍不可变。状态 PATCH 沿用同源/CSRF 和严格 JSON，不创建任务、不自动重试；指定值更新自然幂等，具体字段、归属和水位语义见 API 清单。页面渲染恢复不自动提交，实际状态和工程复验见[第四阶段计划](phase-4-plan.md)。
 
 本文的 JSON 与路径是协议约定；工作台及独立任务簿的实现与验收由阶段计划记录，文档示例不能替代实际验证。示例使用虚构标识，不包含密钥或真实项目源码。方法、路径与归属由 [API 分类与清单](api-catalog.md)维护；具体业务字段在所属任务编码前补充接口表，至少说明方法、路径、输入、响应、错误、幂等性、所属需求及验收用例。
 
@@ -277,6 +304,18 @@ API-47 至 API-56 沿用 `/api/v1/`、Origin/CSRF、严格查询、分页、统�
 - system-labs 定义仅提供两个布尔预测，不接收命令、地址或代码。保存的 definition 包含可信程序摘要；版本漂移拒绝执行。SystemLabRun 与原 LabRun 分开，Job.kind 保持 lab，result_url 指向相应资源；失败允许原预测的新尝试，未知提交恢复原键。
 - observed 表示实际获取观测，不能与预测一致性混淆；unavailable/invalid、部分观测和 cleanup pending/completed/unconfirmed 分别表达。超时场景真实终止且回收属于正常实验结果，清理不确认不能成功发布。失效领取不能写迟到观测。
 
+### M25 搜索与阅读状态契约
+
+既有 projects 列表和 analysis endpoints 列表接受单个可选 q，最大 200 Unicode 字符，空串不筛选；仅大小写不敏感子串，不执行正则、拼接 SQL 或查询视图名称。项目匹配 name，接口匹配 method/path。接口先保留原 index 与关系依据再筛选，不将筛选位置作为接口身份；筛选发生在分页之前，翻页链接保留原 q。其余列表不因此新增 q。
+
+notifications GET 只由 succeeded/failed Job 派生，按 updated_at/id 倒序。NotificationPage 在普通分页外附加 unread_count、as_of 和可空 read_through，results 为 `{job, read}`。GET 不创建通知或阅读状态；全量未读数不等于当前批次数量，未知/失败不能解释为零。
+
+单条通知 PATCH 仅接受 `{read:true}`，拒绝 false、整数、字符串及额外字段；不存在或非终态任务返回 404。全局 `notification-read-state` PATCH 仅接受 `{read_through}`，带时区 ISO 8601 且不晚于服务端当前时间。单行锁保护水位单调推进，旧请求与重复请求不回退；水位之后新完成的任务保持未读。客户端以 GET 返回的 as_of 显式提交，不以本机未来时间扩大范围。
+
+课程 progress GET/PATCH 绑定路径 curriculum_id 的精确课程版本；cards 对应 definition.nodes 的 slug/card_version，顺序不变。GET 返回无记录卡片的 completed=false，不回填；PATCH 只接受严格 completed:boolean，允许取消。课程/卡片组合唯一，其他课程、同 slug 的不同卡片版本或旧课程标记不能污染当前结果；绑定内容缺失返回 409 LEARNING_CONTENT_UNAVAILABLE，不选择最新版本替代。状态只表示用户阅读标记，不证明掌握或正确作答。
+
+新 PATCH 必填字段、JSON 正文和无查询参数语义沿用严格输入，不接受隐式类型转换；Origin/CSRF 与公共错误仍适用。指定状态自然幂等，不新增操作键或后台任务；传输结果未知时先 GET 核实，不自动重发 PATCH。三张新增状态表不在 GET 中创建记录，增量迁移不修改既有 Job、课程、卡片、源码或教学答案。具体五个端点、DTO 与 62 项操作核对以 [API 清单 5.2](api-catalog.md)和导出 OpenAPI 为准，验证仅见第四阶段计划。
+
 ## 10. 修订记录
 
 | 版本 | 日期 | 变更 | 实现状态 |
@@ -301,3 +340,8 @@ API-47 至 API-56 沿用 `/api/v1/`、Origin/CSRF、严格查询、分页、统�
 | v0.18 | 2026-10-01 | 同步 v0.3 学习路径、复习和固定系统实验职责及边界 | 实际状态、证据与限制仅见第三阶段计划 |
 | v0.19 | 2026-10-01 | 校正适用阶段并同步 v1.0 工程复验入口及原操作恢复边界 | 公共协议、Schema 和历史格式不变 |
 | v0.20 | 2026-10-01 | 同步严格快照命名 PATCH、可编辑元数据及自然幂等语义 | 工作台当前 57 个操作；旧源码身份和导入协议保持 |
+| v0.21 | 2026-10-03 | 同步 M25 筛选、通知已读水位与课程精确版本阅读状态的严格输入/自然幂等 | 工作台当前 62 个操作；实际状态与验证唯一见第四阶段计划 |
+
+| v0.22 | 2026-10-03 | 扫描准备、来源、删除隔离、独立日志和退役410契约；旧版本定义保留为历史 |
+| v0.23 | 2026-10-03 | 操作日志独立开始/结束时间、四字段组合筛选、日志列表有界查询及历史时间边界；无数据库迁移 |
+| v0.24 | 2026-10-03 | 固定数字日志编号、名称搜索及10字段查询预算，保留UUID与旧读取兼容；验收唯一见M26 |

@@ -1,10 +1,18 @@
 from django.urls import path
 
+from apps.learning.api.knowledge_views import (
+    SnapshotKnowledgeCardsView,
+    SnapshotKnowledgeHitsView,
+)
 from apps.learning.api.path_views import (
     AttemptReviewsView,
     CurriculaView,
     CurriculumDetailView,
     LearningPathView,
+)
+from apps.learning.api.progress_views import (
+    CurriculumCardProgressView,
+    CurriculumProgressView,
 )
 from apps.learning.api.views import (
     ExerciseAttemptDetailView,
@@ -16,8 +24,24 @@ from apps.learning.api.views import (
 )
 
 urlpatterns = [
+    path(
+        "snapshots/<uuid:snapshot_id>/knowledge-cards/",
+        SnapshotKnowledgeCardsView.as_view(),
+    ),
+    path(
+        "snapshots/<uuid:snapshot_id>/knowledge-hits/",
+        SnapshotKnowledgeHitsView.as_view(),
+    ),
     path("knowledge-curricula/", CurriculaView.as_view()),
     path("knowledge-curricula/<uuid:curriculum_id>/", CurriculumDetailView.as_view()),
+    path(
+        "knowledge-curricula/<uuid:curriculum_id>/progress/",
+        CurriculumProgressView.as_view(),
+    ),
+    path(
+        "knowledge-curricula/<uuid:curriculum_id>/progress/<uuid:card_id>/",
+        CurriculumCardProgressView.as_view(),
+    ),
     path("learning-paths/", LearningPathView.as_view()),
     path("attempt-reviews/", AttemptReviewsView.as_view()),
     path("knowledge-cards/", KnowledgeCardsView.as_view()),

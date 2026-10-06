@@ -27,10 +27,13 @@ from apps.analysis.services import query_graph, read_frontend, submit_analysis
 from apps.analysis.types import GRAPH_VERSION, GraphQuery
 from apps.jobs.api.serializers import ErrorSerializer, JobSerializer
 from apps.projects.models import Snapshot, SourceFile
-from common.api import operation_key, page_response
+from common.api import operation_key, page_response, text_query
 from common.errors import error_body
+from common.resource_state import require_snapshot_available
 
-ERRORS = {status: ErrorSerializer for status in (400, 403, 404, 409, 413, 415, 503)}
+ERRORS = {
+    status: ErrorSerializer for status in (400, 403, 404, 409, 410, 413, 415, 503)
+}
 PAGES = [OpenApiParameter("page", int), OpenApiParameter("page_size", int)]
 
 
@@ -87,18 +90,22 @@ class AnalysisDetailView(APIView):
         operation_id="analyses_retrieve", responses={200: AnalysisSerializer, **ERRORS}
     )
     def get(self, request: Request, analysis_id: uuid.UUID) -> Response:
-        return Response(
-            AnalysisSerializer(get_object_or_404(Analysis, pk=analysis_id)).data
-        )
+        analysis = get_object_or_404(Analysis, pk=analysis_id)
+        require_snapshot_available(analysis.snapshot)
+        return Response(AnalysisSerializer(analysis).data)
 
 
 class EndpointsView(APIView):
     @extend_schema(
         operation_id="analysis_endpoints_list",
-        parameters=PAGES,
+        parameters=[
+            *PAGES,
+            OpenApiParameter("q", {"type": "string", "maxLength": 200}),
+        ],
         responses={200: EndpointPageSerializer, **ERRORS},
     )
     def get(self, request: Request, analysis_id: uuid.UUID) -> Response:
+        filters = text_query(request)
         analysis = get_object_or_404(Analysis, pk=analysis_id)
         frontend = read_frontend(analysis)
         links: dict[int, list[dict[str, Any]]] = defaultdict(list)
@@ -144,7 +151,16 @@ class EndpointsView(APIView):
                         str(uuid.uuid5(analysis.pk, f"endpoint:{index}")),
                     )
                 )
-        return page_response(request, data, EndpointSerializer)
+        # 原始索引属于分析身份，筛选只能发生在索引与关系依据构建之后。
+        if filters.get("q"):
+            query = filters["q"].casefold()
+            data = [
+                item
+                for item in data
+                if query in item["method"].casefold()
+                or query in item["path"].casefold()
+            ]
+        return page_response(request, data, EndpointSerializer, filters=filters)
 
 
 class DiagnosticsView(APIView):
@@ -155,6 +171,7 @@ class DiagnosticsView(APIView):
     )
     def get(self, request: Request, analysis_id: uuid.UUID) -> Response:
         analysis = get_object_or_404(Analysis, pk=analysis_id)
+        require_snapshot_available(analysis.snapshot)
         return page_response(request, analysis.diagnostics, DiagnosticSerializer)
 
 

@@ -1,4 +1,4 @@
-"""在 PostgreSQL 和实际差异进程中验证对比任务、API 和失败恢复。"""
+"""验证对比新增任务退役，已存比较及引用仍可只读校验。"""
 
 import copy
 import hashlib
@@ -19,9 +19,10 @@ from rest_framework.test import APIClient
 from apps.analysis.diffs.engine import compare
 from apps.analysis.diffs.services import (
     execute_comparison,
+    prepare_input,
     submit_comparison,
 )
-from apps.analysis.diffs.types import ComparisonData, ComparisonFailed, ComparisonInput
+from apps.analysis.diffs.types import COMPARISON_VERSION, ComparisonFailed
 from apps.analysis.models import Analysis, SnapshotComparison, SnapshotComparisonRequest
 from apps.analysis.services import execute_analysis
 from apps.analysis.tests.test_analysis import imported, submitted
@@ -37,6 +38,7 @@ from apps.projects.services import execute_import, source_content, submit_import
 from apps.projects.storage import storage_root
 from apps.projects.tests.test_archive import zip_bytes
 from apps.projects.tests.test_projects import upload
+from common.errors import ApiProblem
 
 pytestmark = pytest.mark.django_db(transaction=True)
 PATH = "/api/v1/projects/{project_id}/snapshot-comparisons/"
@@ -65,25 +67,61 @@ def snapshots() -> tuple[Snapshot, Snapshot]:
     return base, Snapshot.objects.get(job=job)
 
 
-def submit(base: Snapshot, target: Snapshot, paired: bool = False) -> Job:
-    analyses = []
-    if paired:
+def submit(
+    base: Snapshot,
+    target: Snapshot,
+    paired: bool = False,
+    *,
+    analyses: tuple[Analysis, Analysis] | None = None,
+) -> Job:
+    """构造升级前已存在的比较请求，不通过已退役服务写入。"""
+    selected = list(analyses or [])
+    if paired and not selected:
         for snapshot in (base, target):
             job = submitted(snapshot)
             execute_analysis(str(job.pk))
-            analyses.append(Analysis.objects.get(job=job))
-    with patch("apps.jobs.services.app.send_task"):
-        return submit_comparison(
-            base.project,
-            uuid.uuid4(),
-            base,
-            target,
-            analyses[0] if paired else None,
-            analyses[1] if paired else None,
-        )[0]
+            selected.append(Analysis.objects.get(job=job))
+    job = Job.objects.create(
+        kind="snapshot_comparison",
+        scope=uuid.uuid4().hex,
+        snapshot_id=target.pk,
+        idempotency_key=uuid.uuid4(),
+        request_digest="0" * 64,
+        status=Job.Status.QUEUED,
+        expires_at=timezone.now() + timedelta(hours=1),
+    )
+    SnapshotComparisonRequest.objects.create(
+        job=job,
+        project=base.project,
+        base_snapshot=base,
+        target_snapshot=target,
+        base_analysis=selected[0] if selected else None,
+        target_analysis=selected[1] if selected else None,
+    )
+    return job
 
 
-def test_actual_pipeline_files_api_history_pairing_and_idempotency(
+def publish_history(job: Job) -> SnapshotComparison:
+    """纯差异算法提供历史夹具值，直接落库模拟升级前已有成功记录。"""
+    record = SnapshotComparisonRequest.objects.select_related(
+        "base_snapshot", "target_snapshot", "base_analysis", "target_analysis"
+    ).get(job=job)
+    data = compare(prepare_input(record))
+    result = SnapshotComparison.objects.create(
+        request=record,
+        comparison_version=COMPARISON_VERSION,
+        summary=data["summary"],
+        data=data,
+    )
+    Job.objects.filter(pk=job.pk).update(
+        status=Job.Status.SUCCEEDED,
+        stage="completed",
+        result_url=DETAIL.format(comparison_id=record.pk),
+    )
+    return result
+
+
+def test_retired_creation_and_historical_files_api_pairing(
     snapshots: tuple[Snapshot, Snapshot],
 ) -> None:
     base, target = snapshots
@@ -103,14 +141,11 @@ def test_actual_pipeline_files_api_history_pairing_and_idempotency(
     }
     with patch("apps.jobs.services.app.send_task") as dispatch:
         first = client.post(path, body, format="json", HTTP_IDEMPOTENCY_KEY=key)
-        assert first.status_code == 202
+        assert first.status_code == 410 and first.json()["code"] == "FEATURE_RETIRED"
         assert_response(first, schema, PATH, "post")
         again = client.post(path, body, format="json", HTTP_IDEMPOTENCY_KEY=key)
-        assert again.status_code == 200 and again.json()["id"] == first.json()["id"]
-        assert (
-            dispatch.call_count == 1
-            and dispatch.call_args.args[0] == "analysis.compare"
-        )
+        assert again.status_code == 410
+        dispatch.assert_not_called()
         changed = client.post(
             path,
             {
@@ -121,8 +156,13 @@ def test_actual_pipeline_files_api_history_pairing_and_idempotency(
             format="json",
             HTTP_IDEMPOTENCY_KEY=key,
         )
-        assert changed.status_code == 409
-    record = SnapshotComparisonRequest.objects.get(job_id=first.json()["id"])
+        assert changed.status_code == 410
+    assert (
+        not SnapshotComparisonRequest.objects.exists()
+        and not SnapshotComparison.objects.exists()
+    )
+    historical = submit(base, target, analyses=(base_analysis, target_analysis))
+    record = SnapshotComparisonRequest.objects.get(job=historical)
     before_history = client.get(path)
     assert_response(before_history, schema, PATH)
     assert before_history.json()["results"][0]["summary"] is None
@@ -130,7 +170,7 @@ def test_actual_pipeline_files_api_history_pairing_and_idempotency(
         client.get(DETAIL.format(comparison_id=record.pk)).json()["code"]
         == "COMPARISON_NOT_READY"
     )
-    execute_comparison(first.json()["id"])
+    publish_history(historical)
     record.job.refresh_from_db()
     assert record.job.status == "succeeded", record.job.error
     assert record.job.snapshot_id == target.pk
@@ -188,7 +228,7 @@ def test_file_only_identical_normalized_newline_and_history_reads(
 ) -> None:
     base, _ = snapshots
     job = submit(base, base)
-    execute_comparison(str(job.pk))
+    publish_history(job)
     result = SnapshotComparison.objects.get(request__job=job)
     assert result.data["comparability"] == "files_only"
     assert result.summary["unchanged"] == base.files.count()
@@ -206,11 +246,11 @@ def test_file_only_identical_normalized_newline_and_history_reads(
     execute_import(str(imported_job.pk))
     target = Snapshot.objects.get(job=imported_job)
     second = submit(base, target)
-    execute_comparison(str(second.pk))
+    publish_history(second)
     assert SnapshotComparison.objects.get(request__job=second).summary == result.summary
 
 
-def test_corrupt_snapshot_fail_retry_and_late_result_cannot_publish(
+def test_retirement_precedes_snapshot_read_retry_and_late_publication(
     snapshots: tuple[Snapshot, Snapshot],
 ) -> None:
     base, target = snapshots
@@ -220,30 +260,36 @@ def test_corrupt_snapshot_fail_retry_and_late_result_cannot_publish(
     location = storage_root() / "snapshots" / str(base.pk) / str(source.pk)
     original = location.read_bytes()
     location.write_bytes(b"corrupt")
-    execute_comparison(str(job.pk))
+    with (
+        patch("apps.analysis.diffs.runner.run_comparison") as parser,
+        patch("apps.analysis.diffs.services.prepare_input") as read_sources,
+    ):
+        execute_comparison(str(job.pk))
+        parser.assert_not_called()
+        read_sources.assert_not_called()
     job.refresh_from_db()
     assert job.error is not None
-    assert job.status == "failed" and job.error["code"] == "SNAPSHOT_NOT_READY"
+    assert job.status == "failed" and job.error["code"] == "FEATURE_RETIRED"
     assert not SnapshotComparison.objects.exists()
     location.write_bytes(original)
-    with patch("apps.jobs.services.app.send_task"):
-        retry = submit_retry(job, uuid.uuid4())[0]
-    assert retry.previous_job_id == job.pk and retry.snapshot_id == target.pk
-    execute_comparison(str(retry.pk))
-    retry.refresh_from_db()
-    assert retry.status == "succeeded" and SnapshotComparison.objects.count() == 1
+    before = Job.objects.count()
+    with (
+        patch("apps.jobs.services.app.send_task") as queue,
+        pytest.raises(ApiProblem) as error,
+    ):
+        submit_retry(job, uuid.uuid4())
+    assert (
+        error.value.machine_code == "FEATURE_RETIRED" and Job.objects.count() == before
+    )
+    queue.assert_not_called()
     another = submit(base, target)
 
-    def late(input: ComparisonInput) -> ComparisonData:
-        value = compare(input)
-        Job.objects.filter(pk=another.pk).update(
-            expires_at=timezone.now() - timedelta(seconds=1)
-        )
-        jobs.reconcile_expired()
-        return value
-
-    with patch("apps.analysis.diffs.services.run_comparison", side_effect=late):
+    with patch(
+        "apps.analysis.diffs.runner.run_comparison",
+        side_effect=AssertionError("退役任务不可计算"),
+    ) as parser:
         execute_comparison(str(another.pk))
+        parser.assert_not_called()
     another.refresh_from_db()
     assert (
         another.status == "failed"
@@ -254,51 +300,61 @@ def test_corrupt_snapshot_fail_retry_and_late_result_cannot_publish(
 @pytest.mark.parametrize(
     "reason", ["output_limit", "comparison_timeout", "file_line_limit"]
 )
-def test_limit_failure_retains_request_and_never_publishes_partial(
+def test_retired_worker_never_reaches_parser_limits_or_partial_publication(
     snapshots: tuple[Snapshot, Snapshot], reason: str
 ) -> None:
     job = submit(*snapshots)
     with patch(
-        "apps.analysis.diffs.services.run_comparison",
+        "apps.analysis.diffs.runner.run_comparison",
         side_effect=ComparisonFailed(reason),
-    ):
+    ) as parser:
         execute_comparison(str(job.pk))
+        parser.assert_not_called()
     job.refresh_from_db()
     assert job.error is not None
-    assert job.status == "failed" and job.error["details"]["reason"] == reason
+    assert job.status == "failed" and job.error["code"] == "FEATURE_RETIRED"
     assert (
         not SnapshotComparison.objects.exists()
         and SnapshotComparisonRequest.objects.filter(job=job).exists()
     )
 
 
-def test_publish_database_error_rolls_back_then_explicit_retry(
+def test_retired_worker_never_reaches_publish_or_retry(
     snapshots: tuple[Snapshot, Snapshot],
 ) -> None:
     job = submit(*snapshots)
     with patch(
         "apps.analysis.diffs.services.SnapshotComparison.objects.create",
         side_effect=DatabaseError("合成写入失败"),
-    ):
+    ) as publish:
         execute_comparison(str(job.pk))
+        publish.assert_not_called()
     job.refresh_from_db()
     assert job.status == "failed" and not SnapshotComparison.objects.exists()
-    with patch("apps.jobs.services.app.send_task"):
-        retry = submit_retry(job, uuid.uuid4())[0]
-    execute_comparison(str(retry.pk))
-    assert SnapshotComparison.objects.filter(request__job=retry).exists()
+    before = Job.objects.count()
+    with (
+        patch("apps.jobs.services.app.send_task") as queue,
+        pytest.raises(ApiProblem) as error,
+    ):
+        submit_retry(job, uuid.uuid4())
+    queue.assert_not_called()
+    assert (
+        error.value.machine_code == "FEATURE_RETIRED" and Job.objects.count() == before
+    )
 
 
-def test_same_key_concurrent_creation_and_queue_delivery_failure(
+def test_retired_same_key_concurrent_creation_never_delivers_queue(
     snapshots: tuple[Snapshot, Snapshot],
 ) -> None:
     base, target = snapshots
     key = uuid.uuid4()
 
-    def create(_: int) -> uuid.UUID:
+    def create(_: int) -> str:
         close_old_connections()
         try:
-            return submit_comparison(base.project, key, base, target, None, None)[0].pk
+            with pytest.raises(ApiProblem) as error:
+                submit_comparison(base.project, key, base, target, None, None)
+            return error.value.machine_code
         finally:
             close_old_connections()
 
@@ -306,18 +362,23 @@ def test_same_key_concurrent_creation_and_queue_delivery_failure(
         with ThreadPoolExecutor(max_workers=2) as pool:
             ids = list(pool.map(create, range(2)))
     assert (
-        ids[0] == ids[1]
-        and send.call_count == 1
-        and SnapshotComparisonRequest.objects.count() == 1
+        set(ids) == {"FEATURE_RETIRED"}
+        and send.call_count == 0
+        and SnapshotComparisonRequest.objects.count() == 0
     )
-    with patch(
-        "apps.jobs.services.app.send_task", side_effect=OperationalError("合成队列故障")
+    with (
+        patch(
+            "apps.jobs.services.app.send_task",
+            side_effect=OperationalError("合成队列故障"),
+        ) as queue,
+        pytest.raises(ApiProblem) as error,
     ):
-        job, created, published = submit_comparison(
-            base.project, uuid.uuid4(), base, target, None, None
-        )
-    assert created and not published and job.status == "failed"
-    assert SnapshotComparisonRequest.objects.filter(job=job).exists()
+        submit_comparison(base.project, uuid.uuid4(), base, target, None, None)
+    queue.assert_not_called()
+    assert (
+        error.value.machine_code == "FEATURE_RETIRED"
+        and not SnapshotComparisonRequest.objects.exists()
+    )
 
 
 def test_scope_pairing_strict_input_and_origin_protection(
@@ -339,7 +400,7 @@ def test_scope_pairing_strict_input_and_origin_protection(
                 format="json",
                 HTTP_IDEMPOTENCY_KEY=str(uuid.uuid4()),
             ).status_code
-            == 400
+            == 410
         )
     other = imported()
     assert (
@@ -349,7 +410,7 @@ def test_scope_pairing_strict_input_and_origin_protection(
             format="json",
             HTTP_IDEMPOTENCY_KEY=str(uuid.uuid4()),
         ).status_code
-        == 409
+        == 410
     )
     job = submitted(base)
     execute_analysis(str(job.pk))
@@ -365,7 +426,7 @@ def test_scope_pairing_strict_input_and_origin_protection(
             format="json",
             HTTP_IDEMPOTENCY_KEY=str(uuid.uuid4()),
         ).status_code
-        == 409
+        == 410
     )
     assert (
         APIClient(enforce_csrf_checks=True).post(path, body, format="json").status_code
@@ -425,8 +486,7 @@ def test_old_explanation_refs_are_read_without_model_and_corrupt_results_fail_cl
     with patch(
         "apps.explanations.adapter.complete", side_effect=AssertionError("不能调用模型")
     ):
-        execute_comparison(str(job.pk))
-        result = SnapshotComparison.objects.get(request__job=job)
+        result = publish_history(job)
         response = client_with_token().get(DETAIL.format(comparison_id=result.pk))
     assert response.status_code == 200
     saved = response.json()["evidence"][0]

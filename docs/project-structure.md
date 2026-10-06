@@ -2,15 +2,43 @@
 
 | 项目 | 内容 |
 | --- | --- |
-| 文档版本 | v0.30 |
+| 文档版本 | v0.36 |
 | 文档状态 | v0.1–v0.3 及 v1.0 稳定性/验收工程已建立；实际验收与限制见所属阶段计划 |
-| 更新日期 | 2026-10-02 |
+| 更新日期 | 2026-10-04 |
 | 适用阶段 | v0.1 首版及后续按职责扩展 |
 | 本文职责 | 目标目录、职责、依赖方向、命名和新增功能放置规则的权威来源 |
 
+## M27 当前结构
+
+M27 延续 M26 的三入口和退役边界；本节为当前规则，M1–M26 的界面与验收保留为阶段历史。课程、练习、实验、比较、影响、人工校准、通知写入及基础检查仍退役，旧写入口返回 `410 FEATURE_RETIRED`。本轮进度和实际证据唯一见[第四阶段计划 M27](phase-4-plan.md#m27)。
+
+当前本地 Git 已建立，分支为 `main`；本轮不创建提交、分支、远程或推送。M26 基础职责继续保留：
+
+| 位置 | 当前职责 |
+| --- | --- |
+| apps/projects/folder.py、archive.py、services.py | 目录清单与确定性归档、来源限额、受控发布及读取 |
+| apps/analysis/scans.py、scan_worker.py、root_discovery.py | 持久扫描、独立子进程、根发现与准备状态衔接 |
+| apps/learning/source_scan.py、knowledge.py | AST/包声明事实、版本卡片及范围筛选 |
+| apps/analysis/shared_graph.py | 按源码符号共享的无向接口关联 |
+| apps/jobs/audit.py、cleanup.py | 独立操作记录及分阶段内部永久清理 |
+| common/retirement.py、resource_state.py | 退役执行拦截及项目→快照→任务资源锁/隔离 |
+| frontend/src/app/MainlineWorkspace.tsx | 三入口与源码/接口/关系/知识/讲解联动 |
+| scripts/check_m26_workspace.py | 随机资源、回环5185、标签核对的专用生命周期 |
+
+只增加必要增量迁移，历史表与只读内容保留；内容加载仅发布可信卡片，不初始化课程/练习。HTTP契约保留原编号，M27只读投影增加至83项，退役操作标记deprecated/410。具体模块文件以实际工程为准，历史实现归属如下。
+
+### M27 重构职责
+
+- `app/ThemeProvider.tsx`、`global.css`和`index.html`固定浅色，`theme-init.js`已删除；`WorkspaceShell`负责64px品牌/搜索/三入口/本地模式外壳。
+- `shared/components/ScrollPanel`负责单实例滚动和记录换页归顶；原`ContentPager`、`content-pagination`及测量测试已删除。`WorkspaceDialog`、搜索和重命名复用有界滚动。
+- `projects/MainlineProjects`、`ProjectActivity`负责真实项目/快照卡片和任务阶段；后端`api/management_views.py`及项目只读投影负责集合查询、筛选和活动，不新建表或GET补写。
+- `projects/SourceWorkspace`负责文件标签、分屏与目录；`SourceViewer`负责200行加载、1000行渲染边界和滚动；`SourceEvidence`消费后端`source_evidence.py`与`api/source_evidence_views.py`的已保存事实分页。
+- `jobs/OperationLogs`组合KPI、筛选、表格/详情；`operation_queries.py`统一列表/统计/CSV范围，`operation_capabilities.py`共享恢复资格，`operation_export.py`限制安全字段和大小。写入口再次校验，原导入/删除/模型契约保持。
+- `contracts/openapi.yaml`与`schema.d.ts`从实际实现生成，工作台83操作；本轮不新增迁移、依赖或运行能力。
+
 ## 1. 阅读方式与当前状态
 
-当前工作区包含项目文档、根目录 [AGENTS.md](../AGENTS.md)、工具基线与基础任务工程，仍未初始化 Git。已有 `backend`、`frontend` 各自的清单、锁文件、版本约束与工具配置；`backend/tooling` 保留无业务的验证样例，`backend/tests` 同时覆盖工具与配置，`frontend/tooling` 还包含本地类型生成入口。根级 `.env.example` 声明配置与安全占位，`.gitignore` 排除运行产物；实际服务配置见下文。
+当前工作区包含项目文档、根目录 [AGENTS.md](../AGENTS.md)、工具基线与基础任务工程，已建立本地 Git `main`（本轮只读核对，无 Git 写操作）。已有 `backend`、`frontend` 各自的清单、锁文件、版本约束与工具配置；`backend/tooling` 保留无业务的验证样例，`backend/tests` 同时覆盖工具与配置，`frontend/tooling` 还包含本地类型生成入口。根级 `.env.example` 声明配置与安全占位，`.gitignore` 排除运行产物；实际服务配置见下文。
 
 `scripts/prepare_toolchain.py` 在 `.runtime` 准备经校验的 Windows x64 工具及 Linux uv；`scripts/test_prepare_toolchain.py` 覆盖摘要失败、缓存与续传边界；`scripts/check-toolchain.ps1` 运行 Windows/Linux 工具检查，Linux 副本白名单包含本次必要配置、模块和前端源码。`frontend/.prettierignore` 排除前端构建和覆盖率产物。`.runtime` 保存隔离工具、缓存、下载、文档基线和脱敏验证记录，不是长期进度来源。
 
@@ -18,7 +46,7 @@ M1-T01 修复增加 `scripts/prepare_backend_wheels.py` 及其测试，按后端
 
 M1-T02 新增 `backend/manage.py`、`config/`、`common/` 与 `apps/jobs/`，包含固定检查模型、API、迁移、Worker 入口和期限核对命令；前端新增 `src/app/`、`features/jobs/`、统一 API 客户端与生成声明。根级 `compose.yaml` 组合 PostgreSQL、Redis、API、Worker、独立核对进程和 Nginx 前端；镜像与代理文件位于 `infra/docker/`、`infra/nginx/`。`scripts/check_local_stack.py` 负责本地 HTTP 与故障验收，`infra/docker/compose.verify.yaml` 仅提供验收用短期限。
 
-`contracts/openapi.yaml` 和前端 `shared/api/generated/schema.d.ts` 包含工作台的 57 个已实现操作；生成脚本为 `frontend/tooling/generate-api-types.mjs`。启动与验证入口见 [README](../README.md)。新增 `examples/task-board` 的独立前后端、三操作 Schema、测试与 README；`testdata/analysis/task-board-create.json` 保存人工关系基准。根 Compose 按需组合示例独立 PostgreSQL/API/前端，使用独立网络、数据与凭据卷；镜像文件为 `infra/docker/task-board-*.Dockerfile`、代理为 `infra/nginx/task-board.conf.template`。`scripts/check_task_board.py` 验证真实 HTTP，`scripts/check_task_board_annotations.py` 及其测试检查引用完整性。下文未说明已有实现的部分仍为目标结构；讲解、学习和固定实验已有本地实现，当前策略的 DeepSeek/deepseek-flash 基础非流式兼容通过，具体证据与限制仅见首阶段计划，不推广至其他模型。
+`contracts/openapi.yaml` 和前端 `shared/api/generated/schema.d.ts` 包含工作台的 83 个契约操作（含明确退役入口）；生成脚本为 `frontend/tooling/generate-api-types.mjs`。启动与验证入口见 [README](../README.md)。新增 `examples/task-board` 的独立前后端、三操作 Schema、测试与 README；`testdata/analysis/task-board-create.json` 保存人工关系基准。根 Compose 按需组合示例独立 PostgreSQL/API/前端，使用独立网络、数据与凭据卷；镜像文件为 `infra/docker/task-board-*.Dockerfile`、代理为 `infra/nginx/task-board.conf.template`。`scripts/check_task_board.py` 验证真实 HTTP，`scripts/check_task_board_annotations.py` 及其测试检查引用完整性。下文未说明已有实现的部分仍为目标结构；讲解、学习和固定实验已有本地实现，当前策略的 DeepSeek/deepseek-flash 基础非流式兼容通过，具体证据与限制仅见首阶段计划，不推广至其他模型。
 
 M1-T04 增加两服务各自的 `common/schema.py`，集中声明既有公共错误、响应头及分页参数约束；示例 `apps/tasks/api/schema.py` 补足严格 title 输入契约，工作台保留原空对象请求 Schema。两套 `test_contract.py` 覆盖无数据库协议边界，新增 `test_contract_responses.py` 使用真实 PostgreSQL 验证持久化响应。两端类型生成器增加只检查模式及 `generate-api-types.test.mjs`；示例客户端新增 `client.test.ts`，工作台扩充既有客户端测试。根 `scripts/check_contracts.py` 与 `test_check_contracts.py` 负责导出、文档清单和保存产物的一致性检查，不是业务服务或平行进度系统。
 
@@ -235,7 +263,7 @@ features/projects/
 
 ## 7. 契约、产物和检查工作目录
 
-`contracts/openapi.yaml` 从后端生成并评审；`frontend/src/shared/api/generated/schema.d.ts` 从该契约生成。二者在开发任务中生成、校验并纳入变更，不手改；工作台当前共 57 个操作，包含 v0.1 的 37 个、v0.2 的 9 个、v0.3 的 10 个，以及用户后续明确授权的快照命名 PATCH。示例公开契约独立维护 3 个操作，实验配置契约维护 7 个操作。`contracts/typescript-analysis.schema.json` 是人工维护的内部解析协议来源，不与 HTTP OpenAPI 混用。
+`contracts/openapi.yaml` 从后端生成并评审；`frontend/src/shared/api/generated/schema.d.ts` 从该契约生成。二者在开发任务中生成、校验并纳入变更，不手改；工作台当前共83个操作，保留历史与退役兼容编号，新增M27八项只读查询；完整登记见API清单。示例公开契约独立维护 3 个操作，实验配置契约维护 7 个操作。`contracts/typescript-analysis.schema.json` 是人工维护的内部解析协议来源，不与 HTTP OpenAPI 混用。
 
 后端命令从 `backend` 执行；导出位置为 `../contracts/openapi.yaml`。前端命令从 `frontend` 执行，其类型生成脚本读取 `../contracts/openapi.yaml` 并写入上述生成目录。Node 解析程序从 `analyzers/typescript` 管理依赖与测试。容器工作目录和挂载必须保持对应关系，不能把相对导出路径写到临时镜像层后声称文件已交付。
 
@@ -312,7 +340,7 @@ M11–M15 的唯一任务进度、恢复与验收来源是[第三阶段计划](p
 
 依赖清单、锁文件、56 个 API、迁移、教学内容/示例版本、HTTP v1 和解析规则均保留。镜像标签 1.0.0 表示本轮作品构建，不将 Python/npm 包清单版本或旧内容/协议编号一并改写。
 
-### M21 UI 专项组件职责
+### M21 UI 专项组件职责（历史，主题和页面由后续阶段替代）
 
 | 位置 | 职责与依赖边界 |
 | --- | --- |
@@ -330,7 +358,7 @@ M11–M15 的唯一任务进度、恢复与验收来源是[第三阶段计划](p
 | `frontend/src/features/jobs/JobsPage.tsx`、`SystemStatusPage.tsx`、`SystemStatusSummary.tsx` | 历史、显式检查与检查摘要分别负责；查询和轮询随页面 active 停用，不作后台持续监控 |
 | `frontend/src/shared/components/Icon.tsx` | 本地受控 SVG 图标与标识，不请求第三方资源 |
 
-12 个页面分别承载工作台、导入、源码、API、关系图、快照与对比、候选影响、知识、练习与实验、模型讲解、系统状态、任务历史。工作台只保留准备摘要和下一步入口；`AnalysisOverview`、`KnowledgeSummary` 等既有摘要组件仍保留，但当前工作台不挂载完整图和知识区域。
+12 个页面分别承载工作台、导入、源码、API、关系图、快照与对比、候选影响、知识、练习与实验、模型讲解、系统状态、任务历史。工作台由 M25 的图片构图组件提供准备、快捷入口和真实项目/课程/分析摘要；`AnalysisOverview`、`KnowledgeSummary` 等既有摘要组件仍保留，但当前工作台不挂载完整图和知识区域。
 
 功能页通过单实例 `hidden` 切换保留同一对象草稿，项目、快照、分析与接口变化时按键隔离。图节点选择保持当前模块；所属接口改变时清理旧预览、讲解、作答、实验、课程目标、panel 和 job，保留同快照源码位置。`section` 优先于旧选择；无 section 的 `panel=learning` 依据作答及课程/目标归属恢复练习或知识，独立作答/实验资源进入练习页。独立源码页在窗口宽度至少 1200px 时并排双窗口，位置仍沿用 URL 引用。
 
@@ -344,11 +372,33 @@ M11–M15 的唯一任务进度、恢复与验收来源是[第三阶段计划](p
 
 本地 Git 按用户明确授权建立 main，现有工程分组留存基线，后续按功能提交；敏感配置、运行证据、IDE、依赖和构建物保持忽略。任务和实测只见[第四阶段计划 M22](phase-4-plan.md#user-review)，不建立其他项目记忆系统。
 
-### M23 分页与系统模块职责
+### M23 分页与系统模块职责（历史，ContentPager已在M27移除）
 
 `shared/components/ContentPager.tsx`、`ContentPager.css` 负责同一内容树的可视页、焦点定位和尺寸观察，`content-pagination.ts` 只计算页范围；对应测试覆盖首尾、并列断点、尺寸变化与草稿。`app/pagination.css` 将原内部纵向滚动纳入页面分页，保持必要横向查看。快照命名复用共享分页，不复制表单；源码搜索展开文件入口。
 
 jobs 公共出口新增 `SystemStatusPage`，检查提交、恢复与结果从 `JobsPage` 分离；历史保留原列表 API 和批次参数，沿 History API 保存上下文。`section=system` 与 `section=jobs` 独立，旧 `view=jobs` 继续有效。未新增后端、协议、依赖或持久化字段，任务与证据唯一见[第四阶段计划 M23](phase-4-plan.md#viewport-pagination)。
+
+### M24 参考前端改造职责（历史）
+
+`app/workspace-navigation.ts` 是四分类与 12 模块映射、默认模块和会话内最近模块的唯一来源；`WorkspaceShell` 负责顶栏分类、当前分类侧栏及窄屏分组模态导航。分类记忆不写入持久化存储，URL 恢复仍归 `workspace-location.ts`。`ThemeProvider` 与 global/workspace 样式统一蓝灰双主题，不改变同源首屏脚本、CSP 或业务表单生命周期。
+
+`shared/components/PagePresentation.tsx` 导出页头与缺少前置/加载/空/错误状态，`Feedback` 继续负责原错误及重新查询操作的呈现。`RecordList.tsx`/CSS 仅承担已读数据的桌面紧凑表格与窄屏单卡片，列和资源选择由所属 feature 传入；不增加查询、内部纵向滚动或独立分页。`PageControls` 表示服务端记录批次，`ContentPager` 表示当前已读内容页，沿用原真实数据、整条记录边界和焦点规则。
+
+projects 的 `ProjectNavigator` 组合项目/快照记录与原创建、选择及导入流程；analysis 的 `AnalysisBrowser` 组合紧凑接口清单与原定义/来源；jobs 的 `JobsPage` 保留列表、批次和检查结果入口，将完整技术字段放在单个按记录展开的 details，`JobStatus` 原状态、错误和重试协议保持。功能局部 CSS 与行为测试和组件同目录，不将业务状态移入 shared。
+
+learning 的 `KnowledgePanel` 管理目录选择与单篇已发布正文，课程/先修路径仍归 `LearningPathPanel`；explanations 的步骤提示只显示原预览、确认和提交状态，不新增外发方式。`tooling/test-dom-setup.ts` 是 Vitest 的 jsdom 媒体查询替身，仅用于组件测试；真实排版另行验收。
+
+M24 的状态和证据唯一见[第四阶段计划](phase-4-plan.md)，M21–M23 历史保留。`.runtime/m24-redesign-20261003` 只存忽略的原件与验证材料，不是独立项目记忆；后端、57 项 API、生成类型、依赖和锁文件不由本专项重建。
+
+### M25 图片首页、搜索与持久化职责（历史）
+
+`app/WorkbenchDashboard` 是只消费数据和事件的展示组件；`RecentProjects` 只在首页读取前三个最近创建项目及其最新已发布快照/分析任务。`WorkspacePage` 组合实际 Analysis 与快照，负责跨功能搜索选择与 `job-result-location` 的原资源归属解析。`WorkspaceShell` 通过搜索插槽挂载唯一 `WorkspaceSearch`，并将快捷键焦点送到顶栏输入；搜索组件分别复用 projects/analysis 公共 API 和已经完整读取的 files，负责直接输入、有效关键词匹配后的锚定结果下拉、关闭与查询取消。空值/纯空白隐藏，清空或换词立即隐藏旧结果并取消请求。结果复用同树 `ContentPager`，不使用模态隔离；共享 `WorkspaceDialog` 继续服务通知等模态区域。源码局部筛选独立保留。
+
+`jobs/notifications.py` 由 Job 终态派生列表，`NotificationRead` 保存单条标记、`NotificationReadState` 保存单调推进的全部已读时间；jobs/0004 仅新增两表。`NotificationControl` 只在页面可见时每 5 秒读取，显式 PATCH 后使缓存失效；`JobsPage` 可按 ID 读取当前批次之外的任务并定位详情。结果导航先读取所属项目、快照和分析，不将其他任务套入当前对象。
+
+`learning/progress.py` 读取课程 definition 精确 card_version；`CurriculumCardProgress` 以课程版本实体和卡片为唯一键，learning/0003 仅新增一表。`CourseReader` 提供独立课程阅读和用户显式学习标记，`CourseSummary` 提供首页真实进度。独立 `course` URL 不依赖 endpoint，原 `curriculum/goal` 仍是接口适用路径。GET 不建记录；进度不改变练习、自评、先修或旧版本。
+
+项目和接口列表仅各自允许 `q`（普通不区分大小写子串，最多 200 字符）；接口筛选前确定原 endpoint index。新增 5 个操作后 OpenAPI/生成 DTO/目录核对 62/3/7（工作台/示例/实验配置），未增加服务、依赖、账号或 Worker 行为。M25 状态和验证唯一见[第四阶段计划](phase-4-plan.md)。
 
 ## 8. 修订记录
 
@@ -383,3 +433,9 @@ jobs 公共出口新增 `SystemStatusPage`，检查提交、恢复与结果从 `
 | v0.28 | 2026-10-01 | 同步服务端快照名称与图内展示职责，当前契约 57 项 | 不改变源码存储或依赖；验证唯一见第四阶段计划 |
 | v0.29 | 2026-10-02 | 同步共享导入校验、准备状态、模态导航及本地 Git 归属 | 不增加 API 或依赖；实际验证唯一见第四阶段计划 M22 |
 | v0.30 | 2026-10-02 | 同步共享内容分页、12 个模块及系统检查/历史边界 | 无后端、契约或依赖变更；验证唯一见第四阶段计划 M23 |
+| v0.31 | 2026-10-03 | 同步 M24 分类映射、共享呈现/记录、知识目录与讲解步骤及媒体查询测试职责 | 保持 app → features → shared、业务与持久化边界；证据唯一见第四阶段计划 |
+| v0.32 | 2026-10-03 | 同步 M25 首页、搜索、通知与课程进度职责，工作台 62 操作与三张新增状态表 | 维持原依赖方向、服务与教学版本；证据唯一见第四阶段计划 M25 |
+| v0.33 | 2026-10-03 | 同步外壳搜索插槽、唯一顶栏输入与非模态结果职责 | 继续复用原 API、完整文件清单和 ContentPager；证据唯一见第四阶段计划 11.6 |
+| v0.34 | 2026-10-03 | 同步搜索组件的有效关键词展开和空白隐藏职责 | 无模块或接口变化；证据唯一见第四阶段计划 11.8 |
+
+| v0.35 | 2026-10-03 | 同步 M26 三入口、扫描/知识/日志/清理模块及75项契约，修正当前Git状态；验收唯一见第四阶段计划 |
